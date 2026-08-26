@@ -1,0 +1,310 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  # =============================================================================
+  # Build & Test
+  # =============================================================================
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+
+      - name: Restore dependencies
+        run: dotnet restore EmployeeMonitoring.sln
+
+      - name: Build solution
+        run: dotnet build EmployeeMonitoring.sln --configuration Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test EmployeeMonitoring.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --logger trx
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: '**/*.trx'
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: '**/coverage.cobertura.xml'
+
+      - name: Build Agent (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          dotnet publish src/Agent/EmployeeMonitoring.Agent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o artifacts/agent
+
+      - name: Upload Agent artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-windows
+          path: artifacts/agent/
+
+  # =============================================================================
+  # Security Scan
+  # =============================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'Employee Monitoring'
+          path: '.'
+          format: 'HTML'
+          out: 'reports'
+          args: >
+            --failOnCVSS 7
+            --suppressionFile '.github/dependency-check-suppressions.xml'
+
+      - name: Upload Dependency Check report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-report
+          path: reports/
+
+  # =============================================================================
+  # Code Quality
+  # =============================================================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install SonarScanner
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=employeemonitoring
+            -Dsonar.organization=company
+            -Dsonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
+
+  # =============================================================================
+  # Docker Build
+  # =============================================================================
+  docker-build:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build-and-test, security-scan, code-quality]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for API
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infra/docker/Dockerfile.api
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Dashboard
+        id: meta-dashboard
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/dashboard
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Dashboard
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infra/docker/Dockerfile.dashboard
+          push: true
+          tags: ${{ steps.meta-dashboard.outputs.tags }}
+          labels: ${{ steps.meta-dashboard.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # =============================================================================
+  # Deploy to Staging
+  # =============================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/k8s-set-context@v4
+        with:
+          kubeconfig: ${{ secrets.STAGING_KUBECONFIG }}
+
+      - name: Deploy to Staging
+        run: |
+          helm upgrade --install employee-monitoring-staging ./infra/helm/employee-monitoring \
+            --namespace monitoring-staging \
+            --create-namespace \
+            --set image.api.tag=${{ github.sha }} \
+            --set image.dashboard.tag=${{ github.sha }} \
+            --set config.database.host=${{ secrets.STAGING_DB_HOST }} \
+            --set config.database.password=${{ secrets.STAGING_DB_PASSWORD }} \
+            --set config.auditDatabase.password=${{ secrets.STAGING_AUDIT_DB_PASSWORD }} \
+            --set config.redis.password=${{ secrets.STAGING_REDIS_PASSWORD }} \
+            --set config.jwt.signingKey=${{ secrets.STAGING_JWT_KEY }} \
+            --set config.oidc.clientSecret=${{ secrets.STAGING_OIDC_SECRET }} \
+            --set config.notifications.email.password=${{ secrets.STAGING_SMTP_PASSWORD }} \
+            --wait --timeout 10m
+
+      - name: Run smoke tests
+        run: |
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=employee-monitoring-staging -n monitoring-staging --timeout=300s
+          curl -f https://staging.monitoring.company.com/health || exit 1
+
+  # =============================================================================
+  # Deploy to Production
+  # =============================================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [docker-build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/k8s-set-context@v4
+        with:
+          kubeconfig: ${{ secrets.PRODUCTION_KUBECONFIG }}
+
+      - name: Deploy to Production
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          helm upgrade --install employee-monitoring ./infra/helm/employee-monitoring \
+            --namespace monitoring \
+            --create-namespace \
+            --version=${VERSION} \
+            --set image.api.tag=${VERSION} \
+            --set image.dashboard.tag=${VERSION} \
+            --set config.database.host=${{ secrets.PROD_DB_HOST }} \
+            --set config.database.password=${{ secrets.PROD_DB_PASSWORD }} \
+            --set config.auditDatabase.password=${{ secrets.PROD_AUDIT_DB_PASSWORD }} \
+            --set config.redis.password=${{ secrets.PROD_REDIS_PASSWORD }} \
+            --set config.jwt.signingKey=${{ secrets.PROD_JWT_KEY }} \
+            --set config.oidc.clientSecret=${{ secrets.PROD_OIDC_SECRET }} \
+            --set config.notifications.email.password=${{ secrets.PROD_SMTP_PASSWORD }} \
+            --wait --timeout 15m
+
+      - name: Run smoke tests
+        run: |
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=employee-monitoring -n monitoring --timeout=300s
+          curl -f https://monitoring.company.com/health || exit 1
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: |
+            artifacts/agent/EmployeeMonitoring.Agent.exe
+          generate_release_notes: true

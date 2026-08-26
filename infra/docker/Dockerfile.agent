@@ -1,0 +1,38 @@
+# Employee Monitoring Agent - Windows Container
+FROM mcr.microsoft.com/dotnet/runtime:8.0-windowsservercore-ltsc2022 AS base
+WORKDIR /app
+
+# Install required Windows features
+RUN dism /online /enable-feature /featurename:NetFx3 /All /NoRestart /Quiet
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0-windowsservercore-ltsc2022 AS build
+WORKDIR /src
+
+# Copy project files
+COPY ["src/Agent/EmployeeMonitoring.Agent.csproj", "src/Agent/"]
+COPY ["src/Contracts/EmployeeMonitoring.Contracts.csproj", "src/Contracts/"]
+COPY ["src/Common/EmployeeMonitoring.Common.csproj", "src/Common/"]
+COPY ["EmployeeMonitoring.sln", "."]
+
+# Restore dependencies
+RUN dotnet restore "EmployeeMonitoring.sln"
+
+# Copy source
+COPY . .
+
+# Build agent
+RUN dotnet publish "src/Agent/EmployeeMonitoring.Agent.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+
+# Create non-root user (Windows containers run as ContainerAdministrator by default)
+# For production, consider using gMSA
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD powershell -command "Get-Process -Name 'EmployeeMonitoring.Agent' -ErrorAction SilentlyContinue | Select-Object -First 1"
+
+# Run as service
+ENTRYPOINT ["EmployeeMonitoring.Agent.exe"]

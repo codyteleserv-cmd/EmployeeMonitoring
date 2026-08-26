@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "employee-monitoring.fullname" . }}-config
+  labels:
+    {{- include "employee-monitoring.labels" . | nindent 4 }}
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  
+  # Database
+  ConnectionStrings__DefaultConnection: "Host={{ .Values.config.database.host }};Port={{ .Values.config.database.port }};Database={{ .Values.config.database.name }};Username={{ .Values.config.database.username }};Password=$(DB_PASSWORD);SSL Mode={{ .Values.config.database.sslMode }}"
+  ConnectionStrings__AuditConnection: "Host={{ .Values.config.auditDatabase.host }};Port={{ .Values.config.auditDatabase.port }};Database={{ .Values.config.auditDatabase.name }};Username={{ .Values.config.auditDatabase.username }};Password=$(AUDIT_DB_PASSWORD);SSL Mode={{ .Values.config.auditDatabase.sslMode }}"
+  
+  # Redis
+  Redis__ConnectionString: "{{ .Values.config.redis.host }}:{{ .Values.config.redis.port }},password=$(REDIS_PASSWORD),ssl={{ .Values.config.redis.ssl }}"
+  
+  # JWT
+  Jwt__Issuer: "{{ .Values.config.jwt.issuer }}"
+  Jwt__Audience: "{{ .Values.config.jwt.audience }}"
+  Jwt__ExpiryMinutes: "{{ .Values.config.jwt.expiryMinutes }}"
+  
+  # OIDC
+  OpenIdConnect__Authority: "{{ .Values.config.oidc.authority }}"
+  OpenIdConnect__ClientId: "{{ .Values.config.oidc.clientId }}"
+  OpenIdConnect__CallbackPath: "{{ .Values.config.oidc.callbackPath }}"
+  
+  # Retention
+  Retention__ScreenshotsDays: "{{ .Values.config.retention.screenshotsDays }}"
+  Retention__ActivityDays: "{{ .Values.config.retention.activityDays }}"
+  Retention__DlpEventsDays: "{{ .Values.config.retention.dlpEventsDays }}"
+  Retention__AuditLogsDays: "{{ .Values.config.retention.auditLogsDays }}"
+  
+  # Notifications
+  Notifications__Email__SmtpHost: "{{ .Values.config.notifications.email.smtpHost }}"
+  Notifications__Email__SmtpPort: "{{ .Values.config.notifications.email.smtpPort }}"
+  Notifications__Email__Username: "{{ .Values.config.notifications.email.username }}"
+  Notifications__Email__FromAddress: "{{ .Values.config.notifications.email.fromAddress }}"
+  
+  Notifications__Teams__WebhookUrl: "{{ .Values.config.notifications.teams.webhookUrl }}"
+  Notifications__Slack__WebhookUrl: "{{ .Values.config.notifications.slack.webhookUrl }}"
+  
+  # Features
+  Features__EnableRealTimeUpdates: "{{ .Values.config.features.enableRealTimeUpdates }}"
+  Features__EnableScreenshotBlur: "{{ .Values.config.features.enableScreenshotBlur }}"
+  Features__EnablePauseNotifications: "{{ .Values.config.features.enablePauseNotifications }}"
+  Features__EnableDlpMonitoring: "{{ .Values.config.features.enableDlpMonitoring }}"
+  
+  # Agent defaults
+  Agent__DefaultScreenshotIntervalSeconds: "{{ .Values.agent.defaultScreenshotIntervalSeconds }}"
+  Agent__DefaultActivityIntervalSeconds: "{{ .Values.agent.defaultActivityIntervalSeconds }}"
+  Agent__HeartbeatTimeoutSeconds: "{{ .Values.agent.heartbeatTimeoutSeconds }}"
+  Agent__MaxBatchSize: "{{ .Values.agent.maxBatchSize }}"

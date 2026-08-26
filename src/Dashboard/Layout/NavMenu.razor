@@ -1,0 +1,67 @@
+@inject NavigationManager Navigation
+@inject AgentStateService AgentState
+@inject AuthService Auth
+
+<MudNavMenu>
+    <MudNavGroup Title="Overview" Expanded="true">
+        <MudNavLink Match="NavLinkMatch.All" Href="/">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Dashboard" /> Dashboard
+        </MudNavLink>
+        <MudNavLink Href="/agents">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Computer" /> Agents
+            <MudBadge Color="Color.Secondary" Size="Size.Small" Class="ms-2">@AgentState.OnlineCount</MudBadge>
+        </MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Monitoring" Expanded="true">
+        <MudNavLink Href="/screenshots">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.PhotoCamera" /> Screenshots
+        </MudNavLink>
+        <MudNavLink Href="/activity">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Timeline" /> Activity
+        </MudNavLink>
+        <MudNavLink Href="/dlp">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Security" /> DLP Events
+            <MudBadge Color="Color.Error" Size="Size.Small" Class="ms-2">@AgentState.UnacknowledgedDlpCount</MudBadge>
+        </MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Compliance" Expanded="true">
+        <MudNavLink Href="/pauses">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.PauseCircle" /> Pause Logs
+        </MudNavLink>
+        <MudNavLink Href="/audit">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.History" /> Audit Log
+        </MudNavLink>
+        <MudNavLink Href="/compliance">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Gavel" /> Compliance
+        </MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Management" Expanded="false">
+        <MudNavLink Href="/users">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.People" /> Users
+        </MudNavLink>
+        <MudNavLink Href="/configuration">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Settings" /> Configuration
+        </MudNavLink>
+        <MudNavLink Href="/alerts">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Notifications" /> Alerts
+        </MudNavLink>
+        <MudNavLink Href="/reports">
+            <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Assessment" /> Reports
+        </MudNavLink>
+    </MudNavGroup>
+
+    @if (Auth.IsAdmin)
+    {
+        <MudNavGroup Title="Administration" Expanded="false">
+            <MudNavLink Href="/admin/roles">
+                <MudIcon Icon="@MudBlazor.Icons.Material.Filled.AdminPanelSettings" /> Roles
+            </MudNavLink>
+            <MudNavLink Href="/admin/integrations">
+                <MudIcon Icon="@MudBlazor.Icons.Material.Filled.IntegrationInstructions" /> Integrations
+            </MudNavLink>
+        </MudNavGroup>
+    }
+</MudNavMenu>

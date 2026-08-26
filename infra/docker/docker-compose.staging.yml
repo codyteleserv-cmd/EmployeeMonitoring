@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Staging
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=employeemonitoring_staging;Username=postgres;Password=postgres
+      - ConnectionStrings__AuditConnection=Host=postgres-audit;Database=employeemonitoring_audit_staging;Username=postgres;Password=postgres
+
+  postgres:
+    environment:
+      POSTGRES_DB: employeemonitoring_staging
+
+  postgres-audit:
+    environment:
+      POSTGRES_DB: employeemonitoring_audit_staging

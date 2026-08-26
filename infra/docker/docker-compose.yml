@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for main data
+  postgres:
+    image: postgres:16-alpine
+    container_name: empmon-postgres
+    environment:
+      POSTGRES_DB: employeemonitoring
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - monitoring-network
+
+  # PostgreSQL for audit logs
+  postgres-audit:
+    image: postgres:16-alpine
+    container_name: empmon-postgres-audit
+    environment:
+      POSTGRES_DB: employeemonitoring_audit
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_audit_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - monitoring-network
+
+  # Redis for caching and SignalR backplane
+  redis:
+    image: redis:7-alpine
+    container_name: empmon-redis
+    command: redis-server --appendonly yes --requirepass redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - monitoring-network
+
+  # API Service
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: empmon-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=employeemonitoring;Username=postgres;Password=postgres
+      - ConnectionStrings__AuditConnection=Host=postgres-audit;Database=employeemonitoring_audit;Username=postgres;Password=postgres
+      - Redis__ConnectionString=redis:6379,password=redis,ssl=False
+      - Jwt__Issuer=EmployeeMonitoring.Api
+      - Jwt__Audience=EmployeeMonitoring.Client
+      - Jwt__SigningKey=your-256-bit-secret-key-here-minimum-32-chars
+      - Jwt__ExpiryMinutes=60
+      - OpenIdConnect__Authority=https://login.microsoftonline.com/your-tenant-id/v2.0
+      - OpenIdConnect__ClientId=your-client-id
+      - OpenIdConnect__ClientSecret=your-client-secret
+      - OpenIdConnect__CallbackPath=/signin-oidc
+      - OpenIdConnect__Scopes__0=openid
+      - OpenIdConnect__Scopes__1=profile
+      - OpenIdConnect__Scopes__2=email
+      - OpenIdConnect__Scopes__3=offline_access
+      - Notifications__Email__SmtpHost=smtp.office365.com
+      - Notifications__Email__SmtpPort=587
+      - Notifications__Email__Username=alerts@company.com
+      - Notifications__Email__Password=password
+      - Notifications__Email__FromAddress=alerts@company.com
+    ports:
+      - "5001:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-audit:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - monitoring-network
+
+  # Dashboard
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.dashboard
+    container_name: empmon-dashboard
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - monitoring-network
+
+volumes:
+  postgres_data:
+  postgres_audit_data:
+  redis_data:
+
+networks:
+  monitoring-network:
+    driver: bridge

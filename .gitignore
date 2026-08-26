@@ -1,0 +1,129 @@
+# Employee Monitoring Platform - .gitignore
+
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+**/artifacts/
+**/publish/
+
+# IDE & Editor
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+**/logs/
+*.log
+*.log.*
+*.log.*
+
+# Test results
+**/TestResults/
+*.trx
+*.cobertura.xml
+*.opencover.xml
+coverage/
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+nuget.config
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
+!*.tfvars.example
+
+# Helm
+charts/
+*.tgz
+
+# Kubernetes
+kubeconfig*
+*.kubeconfig
+
+# Secrets & Certificates
+*.pfx
+*.p12
+*.cer
+*.crt
+*.key
+*.pem
+*.crt
+*.csr
+*.jks
+*.keystore
+*.truststore
+secrets/
+*.secret
+*.env
+.env
+.env.*
+!.env.example
+
+# Agent builds
+artifacts/
+EmployeeMonitoring.Agent.exe
+EmployeeMonitoring.Agent.pdb
+
+# Database
+*.mdf
+*.ldf
+*.sqlite
+*.db
+
+# Backup
+*.dump
+*.bak
+*.backup
+
+# Node.js (for dashboard if using npm)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage
+.nyc_output/
+
+# SonarQube
+.sonarqube/
+
+# VS Code launch
+.vscode/launch.json
+
+# Rider
+.idea/
+
+# IntelliJ
+*.iml
+
+# Visual Studio
+*.userprefs
+
+# Custom
+*.tmp
+*.temp

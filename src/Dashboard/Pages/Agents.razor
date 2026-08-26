@@ -1,0 +1,146 @@
+@page "/agents"
+@page "/agents/{AgentId}"
+
+<PageTitle>Agents</PageTitle>
+
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">All Agents</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudDataGrid Items="@FilteredAgents" Filter="FilterFunc" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                              Sortable="true" SortMode="SortMode.Multiple" PageSize="20" PageSizeOptions="new int[]{10, 25, 50, 100}"
+                              Dense="true" Hover="true" Striped="true" Bordered="true">
+                    <Columns>
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.AgentId)" Title="Agent ID" Width="150px" />
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.DeviceName)" Title="Device" Width="200px" />
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.UserName)" Title="User" Width="150px" />
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.Department)" Title="Department" Width="150px" />
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.Team)" Title="Team" Width="150px" />
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.Status)" Title="Status" Width="120px">
+                            <CellTemplate Context="agent">
+                                <MudChip Color="@GetStatusColor(agent.Status)" Size="Size.Small">@agent.Status</MudChip>
+                            </CellTemplate>
+                        </Column>
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.IsPaused)" Title="Paused" Width="80px">
+                            <CellTemplate Context="agent">
+                                <MudIcon Icon="@(agent.IsPaused ? MudBlazor.Icons.Material.Filled.PauseCircle : MudBlazor.Icons.Material.Filled.PlayCircle)" 
+                                         Color="@(agent.IsPaused ? Color.Warning : Color.Success)" Size="Size.Small" />
+                            </CellTemplate>
+                        </Column>
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.Health)" Title="Health" Width="100px">
+                            <CellTemplate Context="agent">
+                                <MudChip Color="@GetHealthColor(agent.Health)" Size="Size.Small">@agent.Health</MudChip>
+                            </CellTemplate>
+                        </Column>
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.LastHeartbeat)" Title="Last Heartbeat" Width="150px">
+                            <CellTemplate Context="agent">
+                                @agent.LastHeartbeat?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Never"
+                            </CellTemplate>
+                        </Column>
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.PauseMinutesToday)" Title="Pause (min)" Width="100px" />
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.DlpEventsToday)" Title="DLP Events" Width="100px" />
+                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.ProductivityScore)" Title="Productivity" Width="120px">
+                            <CellTemplate Context="agent">
+                                <MudText Class="@($"fw-bold text-{(agent.ProductivityScore >= 70 ? "success" : agent.ProductivityScore >= 40 ? "warning" : "error")}")">
+                                    @agent.ProductivityScore.ToString("F1")%
+                                </MudText>
+                            </CellTemplate>
+                        </Column>
+                        <Column T="AgentViewModel" Title="Actions" Width="150px">
+                            <CellTemplate Context="agent">
+                                <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.Visibility" Size="Size.Small" 
+                                               OnClick="@(() => NavigateToAgent(agent.AgentId))" />
+                                @if (agent.IsPaused)
+                                {
+                                    <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.PlayArrow" Size="Size.Small" Color="Color.Success"
+                                                   OnClick="@(() => ResumeAgent(agent.AgentId))" />
+                                }
+                                else if (AgentState.CanPause(agent.AgentId))
+                                {
+                                    <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.Pause" Size="Size.Small" Color="Color.Warning"
+                                                   OnClick="@(() => PauseAgent(agent.AgentId))" />
+                                }
+                                <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.MoreVert" Size="Size.Small" 
+                                               OnClick="@(() => ShowAgentMenu(agent))" />
+                            </CellTemplate>
+                        </Column>
+                    </Columns>
+                    <PagerContent>
+                        <MudDataGridPager PageSizeOptions="new int[]{10, 25, 50, 100}" />
+                    </PagerContent>
+                </MudDataGrid>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public string? AgentId { get; set; }
+
+    [Inject] AgentStateService AgentState { get; set; } = default!;
+    [Inject] AdminHubService HubService { get; set; } = default!;
+    [Inject] NavigationManager Navigation { get; set; } = default!;
+    [Inject] IDialogService DialogService { get; set; } = default!;
+    [Inject] ISnackbar Snackbar { get; set; } = default!;
+
+    private IEnumerable<AgentViewModel> FilteredAgents => AgentState.Agents.Values;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load agents from API
+        await LoadAgentsAsync();
+    }
+
+    private async Task LoadAgentsAsync()
+    {
+        // Implementation would call API
+        await Task.CompletedTask;
+    }
+
+    private bool FilterFunc(AgentViewModel agent) => true;
+
+    private Color GetStatusColor(AgentState state) => state switch
+    {
+        AgentState.Online => Color.Success,
+        AgentState.Paused => Color.Warning,
+        AgentState.Offline => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetHealthColor(HealthStatus health) => health switch
+    {
+        HealthStatus.Healthy => Color.Success,
+        HealthStatus.Degraded => Color.Warning,
+        HealthStatus.Unhealthy => Color.Error,
+        _ => Color.Default
+    };
+
+    private void NavigateToAgent(string agentId)
+    {
+        Navigation.NavigateTo($"/agents/{agentId}");
+    }
+
+    private async Task PauseAgent(string agentId)
+    {
+        var parameters = new DialogParameters { ["Title"] = "Pause Monitoring", ["Message"] = "Enter reason for pausing:" };
+        var dialog = await DialogService.ShowAsync<PauseReasonDialog>("Pause", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is string reason)
+        {
+            await HubService.SendPauseCommandAsync(agentId, "pause", reason);
+        }
+    }
+
+    private async Task ResumeAgent(string agentId)
+    {
+        await HubService.SendPauseCommandAsync(agentId, "resume", string.Empty);
+    }
+
+    private void ShowAgentMenu(AgentViewModel agent)
+    {
+        // Show context menu with options
+    }
+}
