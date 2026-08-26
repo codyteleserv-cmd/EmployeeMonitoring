@@ -1,0 +1,36 @@
+@inject NavigationManager Navigation
+
+<MudCard Class="h-100" Style="cursor: pointer;" OnClick="@OnClick">
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="8">
+                <MudText Typo="Typo.body2" Class="text-secondary">@Title</MudText>
+                <MudText Typo="Typo.h4" Class="fw-bold">@Value</MudText>
+                @if (!string.IsNullOrEmpty(Unit))
+                {
+                    <MudText Typo="Typo.caption" Class="text-secondary">@Unit</MudText>
+                }
+            </MudItem>
+            <MudItem xs="4" Class="d-flex align-items-center justify-content-end">
+                <MudIcon Icon="@Icon" Size="Size.Large" Color="@Color" Class="opacity-50" />
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public Color Color { get; set; } = Color.Primary;
+    [Parameter] public string? Unit { get; set; }
+    [Parameter] public string? Href { get; set; }
+
+    private void OnClick()
+    {
+        if (!string.IsNullOrEmpty(Href))
+        {
+            Navigation.NavigateTo(Href);
+        }
+    }
+}

@@ -1,0 +1,46 @@
+@inherits LayoutComponentBase
+@inject AdminHubService HubService
+@inject AgentStateService AgentState
+@inject AuthService Auth
+
+<MudLayout>
+    <MudAppBar Elevation="1" Class="shadow-sm">
+        <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.Menu" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+        <MudSpacer />
+        <MudText Typo="Typo.h6" Class="mx-auto">Employee Monitoring Dashboard</MudText>
+        <MudSpacer />
+        <MudAvatar Image="@Auth.User?.Avatar" Class="me-2">
+            @Auth.User?.Initials
+        </MudAvatar>
+        <MudText Typo="Typo.body2" Class="me-4">@Auth.User?.Name</MudText>
+        <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.Logout" OnClick="@Logout" />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="@_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="pt-16">
+        <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private void Logout()
+    {
+        Auth.Logout();
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await HubService.InitializeAsync();
+        await AgentState.InitializeAsync();
+    }
+}

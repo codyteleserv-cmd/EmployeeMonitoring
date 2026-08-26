@@ -1,0 +1,461 @@
+syntax = "proto3";
+
+package EmployeeMonitoring.Contracts;
+
+option csharp_namespace = "EmployeeMonitoring.Contracts";
+
+// ============================================================================
+// Agent ↔ API Communication
+// ============================================================================
+
+service AgentService {
+  // Bidirectional streaming for real-time communication
+  rpc Connect(stream AgentMessage) returns (stream ServerMessage);
+  
+  // Configuration management
+  rpc GetConfiguration(ConfigRequest) returns (AgentConfiguration);
+  rpc UpdateConfiguration(AgentConfiguration) returns (ConfigResponse);
+  
+  // Consent and policy
+  rpc GetConsentStatus(ConsentRequest) returns (ConsentStatus);
+  rpc RecordConsent(ConsentRecord) returns (ConsentResponse);
+  
+  // Health and diagnostics
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetDiagnostics(DiagnosticsRequest) returns (DiagnosticsResponse);
+}
+
+// Base message envelope
+message AgentMessage {
+  oneof payload {
+    AgentRegistration registration = 1;
+    ScreenshotBatch screenshots = 2;
+    ActivityBatch activities = 3;
+    PauseEvent pauseEvent = 4;
+    DlpEvent dlpEvent = 5;
+    Heartbeat heartbeat = 6;
+    DiagnosticInfo diagnostics = 7;
+    ConsentAck consentAck = 8;
+  }
+  string agent_id = 100;
+  int64 timestamp = 101; // Unix milliseconds
+}
+
+message ServerMessage {
+  oneof payload {
+    ConfigUpdate configUpdate = 1;
+    PauseCommand pauseCommand = 2;
+    ConsentRequest consentRequest = 3;
+    DiagnosticCommand diagnosticCommand = 4;
+    Acknowledgement ack = 5;
+  }
+  string correlation_id = 100;
+}
+
+// ============================================================================
+// Registration & Identity
+// ============================================================================
+
+message AgentRegistration {
+  string device_id = 1;
+  string device_name = 2;
+  string os_version = 3;
+  string agent_version = 4;
+  string user_sid = 5;
+  string user_display_name = 6;
+  string department = 7;
+  map<string, string> tags = 8;
+  Capabilities capabilities = 9;
+}
+
+message Capabilities {
+  bool screenshot_capture = 1;
+  bool activity_tracking = 2;
+  bool dlp_monitoring = 3;
+  bool clipboard_monitoring = 4;
+  bool network_monitoring = 5;
+  int32 max_screenshot_interval_seconds = 6;
+  int32 max_activity_interval_seconds = 7;
+}
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
+message ConfigRequest {
+  string agent_id = 1;
+}
+
+message ConfigResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message AgentConfiguration {
+  // Screenshot settings
+  ScreenshotConfig screenshots = 1;
+  
+  // Activity tracking settings
+  ActivityConfig activity = 2;
+  
+  // DLP settings
+  DlpConfig dlp = 3;
+  
+  // Work schedule
+  WorkSchedule workSchedule = 4;
+  
+  // Privacy settings
+  PrivacyConfig privacy = 5;
+  
+  // Server configuration
+  ServerConfig server = 6;
+  
+  int64 config_version = 100;
+  int64 updated_at = 101;
+}
+
+message ScreenshotConfig {
+  bool enabled = 1;
+  int32 interval_seconds = 2; // 600 = 10 minutes
+  int32 quality = 3; // 1-100
+  int32 max_width = 4;
+  int32 max_height = 5;
+  bool smart_blur_enabled = 6;
+  repeated string blur_regions = 7; // Window class names to blur
+  bool multi_monitor = 8;
+  int32 max_batch_size = 9;
+}
+
+message ActivityConfig {
+  bool enabled = 1;
+  int32 sample_interval_seconds = 2; // 60 = 1 minute
+  bool track_foreground_window = 3;
+  bool track_idle_time = 4;
+  bool track_input_activity = 5; // Keyboard/mouse (no keystrokes)
+  repeated ProductivityCategory categories = 6;
+}
+
+message ProductivityCategory {
+  string name = 1; // "productive", "neutral", "distracting"
+  repeated string window_title_patterns = 2;
+  repeated string process_names = 3;
+  repeated string domain_patterns = 4; // For DNS categorization
+  int32 weight = 5; // For scoring
+}
+
+message DlpConfig {
+  bool enabled = 1;
+  bool file_audit_enabled = 2;
+  bool clipboard_pii_enabled = 3;
+  bool crm_export_monitoring = 4;
+  repeated string monitored_paths = 5;
+  repeated PiiPattern pii_patterns = 6;
+  repeated string blocked_domains = 7;
+  repeated string blocked_extensions = 8;
+}
+
+message PiiPattern {
+  string name = 1;
+  string regex = 2;
+  PiiType type = 3;
+  bool redact_in_logs = 4;
+}
+
+enum PiiType {
+  EMAIL = 0;
+  PHONE = 1;
+  SSN = 2;
+  CREDIT_CARD = 3;
+  API_KEY = 4;
+  CUSTOM = 5;
+}
+
+message WorkSchedule {
+  string timezone = 1; // IANA timezone
+  repeated WorkDaySchedule days = 2;
+  bool respect_user_timezone = 3;
+}
+
+message WorkDaySchedule {
+  int32 day_of_week = 1; // 0=Sunday, 1=Monday...
+  string start_time = 2; // HH:mm
+  string end_time = 3; // HH:mm
+  bool monitoring_enabled = 4;
+}
+
+message PrivacyConfig {
+  bool smart_blur_enabled = 1;
+  repeated string blur_window_classes = 2; // "Chrome_WidgetWin_1", "MozillaWindowClass"
+  repeated string blur_field_types = 3; // "password", "credit_card", "ssn"
+  bool anonymize_user_in_aggregates = 4;
+  int32 data_retention_days = 5;
+  bool allow_user_pause = 6;
+  int32 max_pause_minutes_per_day = 7;
+  bool notify_admin_on_pause = 8;
+  bool notify_admin_on_exit = 9;
+}
+
+message ServerConfig {
+  string grpc_endpoint = 1;
+  string signalr_hub_url = 2;
+  string api_base_url = 3;
+  int32 heartbeat_interval_seconds = 4;
+  int32 reconnect_base_delay_seconds = 5;
+  int32 max_reconnect_delay_seconds = 6;
+}
+
+// ============================================================================
+// Consent Management
+// ============================================================================
+
+message ConsentRequest {
+  string agent_id = 1;
+  string user_sid = 2;
+}
+
+message ConsentStatus {
+  bool consent_given = 1;
+  int64 consent_timestamp = 2;
+  string consent_version = 3;
+  string policy_url = 4;
+  repeated string granted_modules = 5; // "screenshots", "activity", "dlp"
+  bool requires_renewal = 6;
+  int64 renewal_deadline = 7;
+}
+
+message ConsentRecord {
+  string agent_id = 1;
+  string user_sid = 2;
+  bool consent_given = 3;
+  string consent_version = 4;
+  repeated string granted_modules = 5;
+  string ip_address = 6;
+  string user_agent = 7;
+}
+
+message ConsentResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ============================================================================
+// Screenshot Data
+// ============================================================================
+
+message ScreenshotBatch {
+  repeated Screenshot screenshots = 1;
+}
+
+message Screenshot {
+  string id = 1;
+  int64 captured_at = 2;
+  int32 monitor_index = 3;
+  int32 width = 4;
+  int32 height = 5;
+  bytes image_data = 6; // JPEG/PNG compressed
+  string format = 7; // "jpeg", "png"
+  bool blurred = 8;
+  repeated BlurRegion blur_regions = 9;
+  string active_window_title = 10;
+  string active_process_name = 11;
+}
+
+message BlurRegion {
+  int32 x = 1;
+  int32 y = 2;
+  int32 width = 3;
+  int32 height = 4;
+  BlurReason reason = 5;
+}
+
+enum BlurReason {
+  PASSWORD_FIELD = 0;
+  CREDIT_CARD_FIELD = 1;
+  SSN_FIELD = 2;
+  CUSTOM_PATTERN = 3;
+  USER_REQUESTED = 4;
+}
+
+// ============================================================================
+// Activity Tracking
+// ============================================================================
+
+message ActivityBatch {
+  repeated ActivitySample samples = 1;
+}
+
+message ActivitySample {
+  int64 timestamp = 1;
+  int32 duration_seconds = 2;
+  string process_name = 3;
+  string window_title = 4;
+  string window_class = 5;
+  string domain = 6; // From DNS/URL if browser
+  ProductivityLevel productivity = 7;
+  bool is_idle = 8;
+  int32 idle_seconds = 9;
+  InputActivityLevel input_level = 10;
+}
+
+enum ProductivityLevel {
+  UNKNOWN = 0;
+  PRODUCTIVE = 1;
+  NEUTRAL = 2;
+  DISTRACTING = 3;
+}
+
+enum InputActivityLevel {
+  NONE = 0;
+  LOW = 1;
+  MODERATE = 2;
+  HIGH = 3;
+}
+
+// ============================================================================
+// Pause/Resume Events (Critical for Compliance)
+// ============================================================================
+
+message PauseEvent {
+  string event_id = 1;
+  int64 timestamp = 2;
+  PauseAction action = 3; // PAUSED or RESUMED
+  string reason = 4; // User-provided reason
+  string user_sid = 5;
+  int32 pause_duration_seconds = 6; // Only set on RESUME
+  bool admin_notified = 7;
+}
+
+enum PauseAction {
+  PAUSED = 0;
+  RESUMED = 1;
+  FORCE_RESUMED = 2; // Admin forced resume
+  EXPIRED = 3; // Max pause time exceeded
+}
+
+message PauseCommand {
+  string command_id = 1;
+  PauseCommandType type = 2;
+  int32 duration_seconds = 3; // For timed pause
+  string reason = 4; // Admin reason
+  string admin_user_id = 5;
+}
+
+enum PauseCommandType {
+  REQUEST_PAUSE = 0;
+  FORCE_RESUME = 1;
+  SET_MAX_PAUSE = 2;
+}
+
+// ============================================================================
+// DLP Events
+// ============================================================================
+
+message DlpEvent {
+  string event_id = 1;
+  int64 timestamp = 2;
+  DlpEventType type = 3;
+  Severity severity = 4;
+  string process_name = 5;
+  string file_path = 6;
+  string details = 7;
+  map<string, string> metadata = 8;
+  bool blocked = 9;
+  string user_sid = 10;
+}
+
+enum DlpEventType {
+  FILE_ACCESS = 0;
+  FILE_COPY = 1;
+  FILE_UPLOAD = 2;
+  CLIPBOARD_PII = 3;
+  CRM_BULK_EXPORT = 4;
+  USB_DEVICE = 5;
+  CLOUD_UPLOAD = 6;
+  PRINT_JOB = 7;
+  EMAIL_ATTACHMENT = 8;
+}
+
+enum Severity {
+  INFO = 0;
+  LOW = 1;
+  MEDIUM = 2;
+  HIGH = 3;
+  CRITICAL = 4;
+}
+
+// ============================================================================
+// Health & Diagnostics
+// ============================================================================
+
+message HeartbeatRequest {
+  string agent_id = 1;
+  int64 timestamp = 2;
+  AgentHealth health = 3;
+}
+
+message HeartbeatResponse {
+  bool acknowledged = 1;
+  int64 server_time = 2;
+  ConfigUpdate configUpdate = 3;
+}
+
+message AgentHealth {
+  bool healthy = 1;
+  int32 cpu_percent = 2;
+  int64 memory_mb = 3;
+  int32 disk_free_percent = 4;
+  int32 network_latency_ms = 5;
+  int32 screenshots_pending = 6;
+  int32 activities_pending = 7;
+  int32 dlp_events_pending = 8;
+  string last_error = 9;
+}
+
+message DiagnosticsRequest {
+  string agent_id = 1;
+  bool include_logs = 2;
+  bool include_performance = 3;
+}
+
+message DiagnosticsResponse {
+  string agent_id = 1;
+  int64 generated_at = 2;
+  string logs = 3;
+  map<string, string> performance = 4;
+  repeated string errors = 5;
+}
+
+message DiagnosticInfo {
+  string agent_id = 1;
+  int64 timestamp = 2;
+  map<string, string> metrics = 3;
+}
+
+message DiagnosticCommand {
+  string command_id = 1;
+  DiagnosticCommandType type = 2;
+  map<string, string> parameters = 3;
+}
+
+enum DiagnosticCommandType {
+  COLLECT_LOGS = 0;
+  RUN_SELF_TEST = 1;
+  RESTART_MODULE = 2;
+  UPLOAD_CRASH_DUMP = 3;
+}
+
+// ============================================================================
+// Configuration Updates
+// ============================================================================
+
+message ConfigUpdate {
+  int64 config_version = 1;
+  AgentConfiguration configuration = 2;
+  bool force_restart = 3;
+}
+
+message Acknowledgement {
+  string original_correlation_id = 1;
+  bool success = 2;
+  string message = 3;
+}

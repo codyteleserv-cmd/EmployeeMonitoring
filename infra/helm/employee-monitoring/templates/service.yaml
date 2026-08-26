@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "employee-monitoring.fullname" . }}-api
+  labels:
+    {{- include "employee-monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: {{ .Values.service.api.type }}
+  ports:
+    - port: {{ .Values.service.api.port }}
+      targetPort: {{ .Values.service.api.targetPort }}
+      protocol: TCP
+      name: http
+    - port: 8081
+      targetPort: 8081
+      protocol: TCP
+      name: grpc
+  selector:
+    {{- include "employee-monitoring.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "employee-monitoring.fullname" . }}-dashboard
+  labels:
+    {{- include "employee-monitoring.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dashboard
+spec:
+  type: {{ .Values.service.dashboard.type }}
+  ports:
+    - port: {{ .Values.service.dashboard.port }}
+      targetPort: {{ .Values.service.dashboard.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "employee-monitoring.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: dashboard

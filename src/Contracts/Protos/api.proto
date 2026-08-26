@@ -1,0 +1,925 @@
+syntax = "proto3";
+
+package EmployeeMonitoring.Contracts;
+
+option csharp_namespace = "EmployeeMonitoring.Contracts";
+
+// ============================================================================
+// Admin Dashboard ↔ API Communication
+// ============================================================================
+
+service AdminService {
+  // Real-time agent monitoring
+  rpc WatchAgents(WatchAgentsRequest) returns (stream AgentStatusUpdate);
+  rpc WatchAgentDetails(WatchAgentDetailsRequest) returns (stream AgentDetailUpdate);
+  
+  // Screenshot retrieval
+  rpc GetScreenshots(GetScreenshotsRequest) returns (stream ScreenshotData);
+  rpc GetScreenshot(GetScreenshotRequest) returns (ScreenshotData);
+  
+  // Activity & Productivity
+  rpc GetActivitySummary(GetActivitySummaryRequest) returns (ActivitySummary);
+  rpc GetProductivityReport(GetProductivityReportRequest) returns (ProductivityReport);
+  rpc GetTeamProductivity(GetTeamProductivityRequest) returns (TeamProductivityReport);
+  
+  // Pause/Resume Management
+  rpc GetPauseEvents(GetPauseEventsRequest) returns (stream PauseEventRecord);
+  rpc GetPauseStatistics(GetPauseStatisticsRequest) returns (PauseStatistics);
+  rpc ForceResumeAgent(ForceResumeRequest) returns (ForceResumeResponse);
+  rpc SendPauseCommand(SendPauseCommandRequest) returns (SendPauseCommandResponse);
+  
+  // DLP Management
+  rpc GetDlpEvents(GetDlpEventsRequest) returns (stream DlpEventRecord);
+  rpc GetDlpStatistics(GetDlpStatisticsRequest) returns (DlpStatistics);
+  rpc AcknowledgeDlpEvent(AcknowledgeDlpEventRequest) returns (AcknowledgeDlpEventResponse);
+  
+  // Configuration Management
+  rpc GetAgentConfiguration(GetAgentConfigRequest) returns (AgentConfiguration);
+  rpc UpdateAgentConfiguration(UpdateAgentConfigRequest) returns (UpdateAgentConfigResponse);
+  rpc GetGlobalConfiguration(GlobalConfigRequest) returns (GlobalConfiguration);
+  rpc UpdateGlobalConfiguration(UpdateGlobalConfigRequest) returns (UpdateGlobalConfigResponse);
+  rpc DeployConfiguration(DeployConfigRequest) returns (DeployConfigResponse);
+  
+  // User & Device Management
+  rpc ListUsers(ListUsersRequest) returns (UserList);
+  rpc GetUser(GetUserRequest) returns (UserProfile);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc ListDevices(ListDevicesRequest) returns (DeviceList);
+  rpc GetDevice(GetDeviceRequest) returns (DeviceDetail);
+  rpc DecommissionDevice(DecommissionDeviceRequest) returns (DecommissionResponse);
+  
+  // Consent Management
+  rpc GetConsentStatuses(GetConsentStatusesRequest) returns (stream ConsentStatusRecord);
+  rpc RequestConsent(RequestConsentRequest) returns (RequestConsentResponse);
+  
+  // Audit & Compliance
+  rpc GetAuditLog(GetAuditLogRequest) returns (stream AuditLogEntry);
+  rpc ExportAuditLog(ExportAuditLogRequest) returns (ExportAuditLogResponse);
+  rpc GetComplianceReport(GetComplianceReportRequest) returns (ComplianceReport);
+  
+  // Alerts & Notifications
+  rpc GetAlerts(GetAlertsRequest) returns (stream AlertRecord);
+  rpc AcknowledgeAlert(AcknowledgeAlertRequest) returns (AcknowledgeAlertResponse);
+  rpc CreateAlertRule(CreateAlertRuleRequest) returns (AlertRule);
+  rpc UpdateAlertRule(UpdateAlertRuleRequest) returns (AlertRule);
+  rpc DeleteAlertRule(DeleteAlertRuleRequest) returns (DeleteAlertRuleResponse);
+  rpc ListAlertRules(ListAlertRulesRequest) returns (AlertRuleList);
+  
+  // Reports & Exports
+  rpc GenerateReport(GenerateReportRequest) returns (ReportJob);
+  rpc GetReportStatus(GetReportStatusRequest) returns (ReportJob);
+  rpc DownloadReport(DownloadReportRequest) returns (stream ReportChunk);
+}
+
+// ============================================================================
+// Real-time Monitoring
+// ============================================================================
+
+message WatchAgentsRequest {
+  repeated string group_ids = 1;
+  repeated string department_ids = 2;
+  bool include_offline = 3;
+}
+
+message AgentStatusUpdate {
+  string agent_id = 1;
+  string device_name = 2;
+  string user_name = 3;
+  string department = 4;
+  AgentState state = 5;
+  int64 last_heartbeat = 6;
+  int64 last_screenshot = 7;
+  int64 last_activity = 8;
+  bool is_paused = 9;
+  int32 current_pause_duration_seconds = 10;
+  HealthStatus health = 11;
+  map<string, string> tags = 12;
+}
+
+enum AgentState {
+  UNKNOWN = 0;
+  ONLINE = 1;
+  PAUSED = 2;
+  OFFLINE = 3;
+  UNREGISTERED = 4;
+  ERROR = 5;
+}
+
+enum HealthStatus {
+  HEALTHY = 0;
+  DEGRADED = 1;
+  UNHEALTHY = 2;
+  UNKNOWN = 3;
+}
+
+message WatchAgentDetailsRequest {
+  string agent_id = 1;
+}
+
+message AgentDetailUpdate {
+  string agent_id = 1;
+  oneof update {
+    ScreenshotData screenshot = 1;
+    ActivitySample activity = 2;
+    PauseEventRecord pauseEvent = 3;
+    DlpEventRecord dlpEvent = 4;
+    HealthStatus health = 5;
+  }
+}
+
+// ============================================================================
+// Screenshots
+// ============================================================================
+
+message GetScreenshotsRequest {
+  string agent_id = 1;
+  int64 start_time = 2;
+  int64 end_time = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+  bool include_blurred = 6;
+}
+
+message GetScreenshotRequest {
+  string screenshot_id = 1;
+  bool include_blurred = 2;
+}
+
+message ScreenshotData {
+  string id = 1;
+  string agent_id = 2;
+  int64 captured_at = 3;
+  int32 monitor_index = 4;
+  int32 width = 5;
+  int32 height = 6;
+  bytes thumbnail = 7; // Small thumbnail for list view
+  bytes full_image = 8; // Full resolution (only if requested)
+  string format = 9;
+  bool blurred = 10;
+  repeated BlurRegion blur_regions = 11;
+  string active_window_title = 12;
+  string active_process_name = 13;
+  ProductivityLevel productivity = 14;
+}
+
+// ============================================================================
+// Activity & Productivity
+// ============================================================================
+
+message GetActivitySummaryRequest {
+  string agent_id = 1;
+  int64 start_time = 2;
+  int64 end_time = 3;
+  int32 bucket_minutes = 4; // Aggregation bucket size
+}
+
+message ActivitySummary {
+  string agent_id = 1;
+  int64 start_time = 2;
+  int64 end_time = 3;
+  repeated ActivityBucket buckets = 4;
+  ActivityTotals totals = 5;
+}
+
+message ActivityBucket {
+  int64 bucket_start = 1;
+  int32 duration_seconds = 2;
+  string top_process = 3;
+  string top_window_title = 4;
+  ProductivityLevel productivity = 5;
+  int32 idle_seconds = 6;
+  int32 active_seconds = 7;
+  InputActivityLevel input_level = 8;
+}
+
+message ActivityTotals {
+  int32 total_seconds = 1;
+  int32 productive_seconds = 2;
+  int32 neutral_seconds = 3;
+  int32 distracting_seconds = 4;
+  int32 idle_seconds = 5;
+  double productivity_score = 6; // 0-100
+  map<string, int32> process_breakdown = 7;
+  map<string, int32> category_breakdown = 8;
+}
+
+message GetProductivityReportRequest {
+  repeated string agent_ids = 1;
+  repeated string group_ids = 2;
+  repeated string department_ids = 3;
+  int64 start_time = 4;
+  int64 end_time = 5;
+  int32 bucket_minutes = 6;
+  bool include_breakdown = 7;
+}
+
+message ProductivityReport {
+  int64 start_time = 1;
+  int64 end_time = 2;
+  int32 total_agents = 3;
+  repeated AgentProductivity agents = 4;
+  TeamAggregates team = 5;
+}
+
+message AgentProductivity {
+  string agent_id = 1;
+  string user_name = 2;
+  string department = 3;
+  double productivity_score = 4;
+  int32 productive_seconds = 5;
+  int32 neutral_seconds = 6;
+  int32 distracting_seconds = 7;
+  int32 idle_seconds = 8;
+  int32 pause_seconds = 9;
+  int32 pause_count = 10;
+  int32 total_pause_duration_seconds = 11;
+  map<string, int32> top_apps = 12;
+  map<string, int32> top_categories = 13;
+}
+
+message TeamAggregates {
+  double avg_productivity_score = 1;
+  int32 total_productive_seconds = 2;
+  int32 total_distracting_seconds = 3;
+  int32 total_pause_seconds = 4;
+  int32 agents_online = 5;
+  int32 agents_paused = 6;
+  int32 agents_offline = 7;
+  map<string, double> productivity_by_department = 8;
+  map<string, double> productivity_by_team = 9;
+}
+
+message GetTeamProductivityRequest {
+  string team_id = 1;
+  int64 start_time = 2;
+  int64 end_time = 3;
+}
+
+message TeamProductivityReport {
+  string team_id = 1;
+  string team_name = 2;
+  int64 start_time = 3;
+  int64 end_time = 4;
+  repeated AgentProductivity members = 5;
+  TeamAggregates aggregates = 6;
+  repeated DailyTrend daily_trends = 7;
+}
+
+message DailyTrend {
+  string date = 1; // YYYY-MM-DD
+  double avg_productivity = 2;
+  int32 avg_pause_minutes = 3;
+  int32 active_agents = 4;
+}
+
+// ============================================================================
+// Pause/Resume Management (Critical for Compliance)
+// ============================================================================
+
+message GetPauseEventsRequest {
+  repeated string agent_ids = 1;
+  int64 start_time = 2;
+  int64 end_time = 3;
+  PauseAction filter_action = 4;
+  int32 limit = 5;
+  int32 offset = 6;
+}
+
+message PauseEventRecord {
+  string event_id = 1;
+  string agent_id = 2;
+  string user_name = 3;
+  string department = 4;
+  int64 timestamp = 5;
+  PauseAction action = 6;
+  string reason = 7;
+  int32 pause_duration_seconds = 8; // Only for RESUMED
+  bool admin_notified = 9;
+  string admin_notification_id = 10;
+}
+
+message GetPauseStatisticsRequest {
+  repeated string agent_ids = 1;
+  repeated string group_ids = 2;
+  repeated string department_ids = 3;
+  int64 start_time = 4;
+  int64 end_time = 5;
+}
+
+message PauseStatistics {
+  int64 start_time = 1;
+  int64 end_time = 2;
+  int32 total_pause_events = 3;
+  int32 total_agents_paused = 4;
+  int32 total_pause_duration_seconds = 5;
+  double avg_pause_duration_seconds = 6;
+  int32 max_pause_duration_seconds = 7;
+  repeated PauseByAgent agent_breakdown = 8;
+  repeated PauseByReason reason_breakdown = 9;
+  repeated PauseByTime time_breakdown = 10;
+}
+
+message PauseByAgent {
+  string agent_id = 1;
+  string user_name = 2;
+  int32 pause_count = 3;
+  int32 total_pause_seconds = 4;
+  double avg_pause_seconds = 5;
+}
+
+message PauseByReason {
+  string reason = 1;
+  int32 count = 2;
+  int32 total_seconds = 3;
+}
+
+message PauseByTime {
+  string hour_bucket = 1; // HH:00
+  int32 pause_count = 2;
+}
+
+message ForceResumeRequest {
+  string agent_id = 1;
+  string admin_user_id = 2;
+  string reason = 3;
+}
+
+message ForceResumeResponse {
+  bool success = 1;
+  string message = 2;
+  string command_id = 3;
+}
+
+message SendPauseCommandRequest {
+  string agent_id = 1;
+  PauseCommand command = 2;
+}
+
+message SendPauseCommandResponse {
+  bool success = 1;
+  string message = 2;
+  string command_id = 3;
+}
+
+// ============================================================================
+// DLP Management
+// ============================================================================
+
+message GetDlpEventsRequest {
+  repeated string agent_ids = 1;
+  repeated DlpEventType types = 2;
+  repeated Severity severities = 3;
+  int64 start_time = 4;
+  int64 end_time = 5;
+  bool acknowledged_only = 6;
+  bool unacknowledged_only = 7;
+  int32 limit = 8;
+  int32 offset = 9;
+}
+
+message DlpEventRecord {
+  string event_id = 1;
+  string agent_id = 2;
+  string user_name = 3;
+  string department = 4;
+  int64 timestamp = 5;
+  DlpEventType type = 6;
+  Severity severity = 7;
+  string process_name = 8;
+  string file_path = 9;
+  string details = 10;
+  map<string, string> metadata = 11;
+  bool blocked = 12;
+  bool acknowledged = 13;
+  string acknowledged_by = 14;
+  int64 acknowledged_at = 15;
+}
+
+message GetDlpStatisticsRequest {
+  repeated string agent_ids = 1;
+  repeated string group_ids = 2;
+  int64 start_time = 3;
+  int64 end_time = 4;
+}
+
+message DlpStatistics {
+  int64 start_time = 1;
+  int64 end_time = 2;
+  int32 total_events = 3;
+  map<DlpEventType, int32> by_type = 4;
+  map<Severity, int32> by_severity = 5;
+  int32 blocked_count = 6;
+  int32 acknowledged_count = 7;
+  repeated TopDlpSource top_sources = 8;
+  repeated TopDlpUser top_users = 9;
+}
+
+message TopDlpSource {
+  string source = 1; // Process name or path
+  int32 event_count = 2;
+}
+
+message TopDlpUser {
+  string agent_id = 1;
+  string user_name = 2;
+  int32 event_count = 3;
+  int32 high_severity_count = 4;
+}
+
+message AcknowledgeDlpEventRequest {
+  string event_id = 1;
+  string admin_user_id = 2;
+  string notes = 3;
+}
+
+message AcknowledgeDlpEventResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ============================================================================
+// Configuration Management
+// ============================================================================
+
+message GetAgentConfigRequest {
+  string agent_id = 1;
+}
+
+message UpdateAgentConfigRequest {
+  string agent_id = 1;
+  AgentConfiguration configuration = 2;
+  bool force_push = 3;
+  string admin_user_id = 4;
+}
+
+message UpdateAgentConfigResponse {
+  bool success = 1;
+  string message = 2;
+  int64 config_version = 3;
+}
+
+message GlobalConfigRequest {
+  string scope = 1; // "global", "department:IT", "team:Sales"
+}
+
+message GlobalConfiguration {
+  string scope = 1;
+  AgentConfiguration default_config = 2;
+  map<string, AgentConfiguration> overrides = 3; // Key: scope identifier
+  int64 version = 4;
+  int64 updated_at = 5;
+  string updated_by = 6;
+}
+
+message UpdateGlobalConfigRequest {
+  string scope = 1;
+  AgentConfiguration configuration = 2;
+  string admin_user_id = 3;
+}
+
+message UpdateGlobalConfigResponse {
+  bool success = 1;
+  string message = 2;
+  int64 version = 3;
+}
+
+message DeployConfigRequest {
+  repeated string agent_ids = 1;
+  repeated string group_ids = 2;
+  int64 config_version = 3;
+  bool force_restart = 4;
+}
+
+message DeployConfigResponse {
+  bool success = 1;
+  string message = 2;
+  int32 targeted_agents = 3;
+  int32 accepted_agents = 4;
+}
+
+// ============================================================================
+// User & Device Management
+// ============================================================================
+
+message ListUsersRequest {
+  string department = 1;
+  string team = 2;
+  bool active_only = 3;
+  int32 page = 4;
+  int32 page_size = 5;
+}
+
+message UserList {
+  repeated UserProfile users = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message UserProfile {
+  string user_id = 1;
+  string user_sid = 2;
+  string display_name = 3;
+  string email = 4;
+  string department = 5;
+  string team = 6;
+  string role = 7; // "employee", "team_lead", "admin", "security"
+  bool active = 8;
+  int64 last_seen = 9;
+  repeated string agent_ids = 10;
+  ConsentStatusRecord consent = 11;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message UpdateUserRequest {
+  string user_id = 1;
+  string department = 2;
+  string team = 3;
+  string role = 4;
+  bool active = 5;
+}
+
+message UpdateUserResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ListDevicesRequest {
+  string user_id = 1;
+  AgentState state = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message DeviceList {
+  repeated DeviceDetail devices = 1;
+  int32 total_count = 2;
+}
+
+message DeviceDetail {
+  string agent_id = 1;
+  string device_id = 2;
+  string device_name = 3;
+  string user_id = 4;
+  string user_name = 5;
+  string os_version = 6;
+  string agent_version = 7;
+  AgentState state = 8;
+  int64 enrolled_at = 9;
+  int64 last_heartbeat = 10;
+  int64 last_screenshot = 11;
+  int64 last_activity = 12;
+  bool is_paused = 13;
+  int32 current_pause_duration_seconds = 14;
+  HealthStatus health = 15;
+  map<string, string> tags = 16;
+}
+
+message GetDeviceRequest {
+  string agent_id = 1;
+}
+
+message DecommissionDeviceRequest {
+  string agent_id = 1;
+  string admin_user_id = 2;
+  string reason = 3;
+}
+
+message DecommissionResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ============================================================================
+// Consent Management
+// ============================================================================
+
+message GetConsentStatusesRequest {
+  repeated string agent_ids = 1;
+  bool needs_renewal_only = 2;
+}
+
+message ConsentStatusRecord {
+  string agent_id = 1;
+  string user_name = 2;
+  bool consent_given = 3;
+  int64 consent_timestamp = 4;
+  string consent_version = 5;
+  repeated string granted_modules = 6;
+  bool requires_renewal = 7;
+  int64 renewal_deadline = 8;
+}
+
+message RequestConsentRequest {
+  string agent_id = 1;
+  string admin_user_id = 2;
+  string message = 3;
+}
+
+message RequestConsentResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// ============================================================================
+// Audit & Compliance
+// ============================================================================
+
+message GetAuditLogRequest {
+  repeated string actor_ids = 1;
+  repeated AuditAction actions = 2;
+  int64 start_time = 3;
+  int64 end_time = 4;
+  repeated string target_types = 5; // "agent", "user", "config", "consent"
+  int32 limit = 6;
+  int32 offset = 7;
+}
+
+message AuditLogEntry {
+  string log_id = 1;
+  int64 timestamp = 2;
+  string actor_id = 3;
+  string actor_name = 4;
+  string actor_role = 5;
+  AuditAction action = 6;
+  string target_type = 7;
+  string target_id = 8;
+  string target_name = 9;
+  string details = 10;
+  string ip_address = 11;
+  string user_agent = 12;
+  bool success = 13;
+  string error_message = 14;
+}
+
+enum AuditAction {
+  LOGIN = 0;
+  LOGOUT = 1;
+  VIEW_SCREENSHOT = 2;
+  VIEW_ACTIVITY = 3;
+  VIEW_DLP_EVENT = 4;
+  PAUSE_AGENT = 5;
+  RESUME_AGENT = 6;
+  FORCE_RESUME = 7;
+  UPDATE_CONFIG = 8;
+  DEPLOY_CONFIG = 9;
+  ACKNOWLEDGE_DLP = 10;
+  CREATE_ALERT_RULE = 11;
+  UPDATE_ALERT_RULE = 12;
+  DELETE_ALERT_RULE = 13;
+  EXPORT_DATA = 14;
+  REQUEST_CONSENT = 15;
+  VIEW_AUDIT_LOG = 16;
+  DECOMMISSION_DEVICE = 17;
+  UPDATE_USER = 18;
+}
+
+message ExportAuditLogRequest {
+  int64 start_time = 1;
+  int64 end_time = 2;
+  ExportFormat format = 3;
+  repeated string actor_ids = 4;
+  repeated AuditAction actions = 5;
+}
+
+message ExportAuditLogResponse {
+  string download_url = 1;
+  int64 expires_at = 2;
+  int64 record_count = 3;
+}
+
+enum ExportFormat {
+  CSV = 0;
+  JSON = 1;
+  PDF = 2;
+  XLSX = 3;
+}
+
+message GetComplianceReportRequest {
+  int64 start_time = 1;
+  int64 end_time = 2;
+  repeated string departments = 3;
+}
+
+message ComplianceReport {
+  int64 generated_at = 1;
+  int64 period_start = 2;
+  int64 period_end = 3;
+  int32 total_agents = 4;
+  int32 consented_agents = 5;
+  int32 non_consented_agents = 6;
+  int32 agents_with_pauses = 7;
+  int32 total_pause_events = 8;
+  int32 total_pause_duration_seconds = 9;
+  int32 dlp_events = 10;
+  int32 acknowledged_dlp_events = 11;
+  int32 unacknowledged_dlp_events = 12;
+  int32 config_changes = 13;
+  int32 admin_actions = 14;
+  repeated ComplianceViolation violations = 15;
+}
+
+message ComplianceViolation {
+  string type = 1; // "max_pause_exceeded", "consent_expired", "config_drift"
+  string agent_id = 2;
+  string user_name = 3;
+  string description = 4;
+  int64 detected_at = 5;
+  Severity severity = 6;
+  bool resolved = 7;
+}
+
+// ============================================================================
+// Alerts & Notifications
+// ============================================================================
+
+message GetAlertsRequest {
+  repeated string agent_ids = 1;
+  repeated AlertSeverity severities = 2;
+  repeated AlertType types = 3;
+  bool acknowledged_only = 4;
+  bool unacknowledged_only = 5;
+  int64 start_time = 6;
+  int64 end_time = 7;
+  int32 limit = 8;
+  int32 offset = 9;
+}
+
+message AlertRecord {
+  string alert_id = 1;
+  string agent_id = 2;
+  string user_name = 3;
+  AlertType type = 4;
+  AlertSeverity severity = 5;
+  string title = 6;
+  string description = 7;
+  int64 created_at = 8;
+  bool acknowledged = 9;
+  string acknowledged_by = 10;
+  int64 acknowledged_at = 11;
+  map<string, string> metadata = 12;
+}
+
+enum AlertType {
+  AGENT_OFFLINE = 0;
+  AGENT_ERROR = 1;
+  PAUSE_EXCEEDED = 2;
+  PAUSE_WITHOUT_REASON = 3;
+  DLP_HIGH_SEVERITY = 4;
+  DLP_CRITICAL = 5;
+  CONSENT_EXPIRED = 6;
+  CONSENT_REVOKED = 7;
+  CONFIG_DRIFT = 8;
+  PRODUCTIVITY_LOW = 9;
+  UNAUTHORIZED_ACCESS = 10;
+  HEARTBEAT_MISSED = 11;
+}
+
+enum AlertSeverity {
+  INFO = 0;
+  WARNING = 1;
+  HIGH = 2;
+  CRITICAL = 3;
+}
+
+message AcknowledgeAlertRequest {
+  string alert_id = 1;
+  string admin_user_id = 2;
+  string notes = 3;
+}
+
+message AcknowledgeAlertResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message CreateAlertRuleRequest {
+  string name = 1;
+  string description = 2;
+  AlertType type = 3;
+  AlertSeverity severity = 4;
+  string condition = 5; // JSON condition expression
+  repeated string target_groups = 6;
+  repeated string target_departments = 7;
+  repeated NotificationChannel channels = 8;
+  bool enabled = 9;
+  string created_by = 10;
+}
+
+message UpdateAlertRuleRequest {
+  string rule_id = 1;
+  string name = 2;
+  string description = 3;
+  AlertSeverity severity = 4;
+  string condition = 5;
+  repeated string target_groups = 6;
+  repeated string target_departments = 7;
+  repeated NotificationChannel channels = 8;
+  bool enabled = 9;
+}
+
+message DeleteAlertRuleRequest {
+  string rule_id = 1;
+}
+
+message DeleteAlertRuleResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ListAlertRulesRequest {
+  bool enabled_only = 1;
+}
+
+message AlertRuleList {
+  repeated AlertRule rules = 1;
+}
+
+message AlertRule {
+  string rule_id = 1;
+  string name = 2;
+  string description = 3;
+  AlertType type = 4;
+  AlertSeverity severity = 5;
+  string condition = 6;
+  repeated string target_groups = 7;
+  repeated string target_departments = 8;
+  repeated NotificationChannel channels = 9;
+  bool enabled = 10;
+  int64 created_at = 11;
+  string created_by = 12;
+  int64 updated_at = 13;
+  string updated_by = 14;
+}
+
+enum NotificationChannel {
+  EMAIL = 0;
+  TEAMS = 1;
+  SLACK = 2;
+  WEBHOOK = 3;
+  SMS = 4;
+  IN_APP = 5;
+}
+
+// ============================================================================
+// Reports & Exports
+// ============================================================================
+
+message GenerateReportRequest {
+  ReportType type = 1;
+  int64 start_time = 2;
+  int64 end_time = 3.
+  repeated string agent_ids = 4;
+  repeated string group_ids = 5;
+  repeated string department_ids = 6;
+  map<string, string> parameters = 7;
+  string requested_by = 8;
+}
+
+message ReportJob {
+  string job_id = 1;
+  ReportType type = 2;
+  ReportStatus status = 3.
+  int64 created_at = 4.
+  int64 started_at = 5.
+  int64 completed_at = 6.
+  double progress = 7.
+  string download_url = 8.
+  int64 expires_at = 9.
+  string error_message = 10.
+}
+
+enum ReportType {
+  PRODUCTIVITY_SUMMARY = 0;
+  DLP_INCIDENTS = 1;
+  PAUSE_ANALYSIS = 2;
+  COMPLIANCE = 3;
+  AGENT_HEALTH = 4;
+  USER_ACTIVITY = 5;
+  CUSTOM = 6;
+}
+
+enum ReportStatus {
+  QUEUED = 0;
+  RUNNING = 1;
+  COMPLETED = 2;
+  FAILED = 3;
+  EXPIRED = 4;
+}
+
+message GetReportStatusRequest {
+  string job_id = 1.
+}
+
+message DownloadReportRequest {
+  string job_id = 1.
+  int32 chunk_size = 2. // KB
+}
+
+message ReportChunk {
+  bytes data = 1.
+  bool is_final = 2.
+}

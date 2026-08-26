@@ -1,20 +1,20 @@
-modules = ["nodejs-24"]
+run = "cd src/Api && dotnet EmployeeMonitoring.Api.dll"
+modules = ["dotnet-8.0", "postgresql-16"]
+
+[nix]
+channel = "stable-23.11"
+packages = ["redis"]
 
 [deployment]
-router = "application"
-deploymentTarget = "autoscale"
+run = ["sh", "-c", "cd src/Api && dotnet EmployeeMonitoring.Api.dll"]
+deploymentTarget = "cloudrun"
 
-[deployment.postBuild]
-args = ["pnpm", "store", "prune"]
-env = { "CI" = "true" }
+[[ports]]
+localPort = 8080
+externalPort = 80
 
-[workflows]
-runButton = "Project"
+[userenv]
 
-[agent]
-stack = "PNPM_WORKSPACE"
-expertMode = true
-
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 20000
+[userenv.shared]
+ASPNETCORE_ENVIRONMENT = "Production"
+ASPNETCORE_URLS = "http://0.0.0.0:8080"
