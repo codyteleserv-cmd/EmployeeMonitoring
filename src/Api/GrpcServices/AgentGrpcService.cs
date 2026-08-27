@@ -4,6 +4,12 @@ using EmployeeMonitoring.Api.Services;
 using EmployeeMonitoring.Contracts;
 using Grpc.Core;
 using Microsoft.EntityFrameworkCore;
+using PauseEvent = EmployeeMonitoring.Contracts.PauseEvent;
+using DlpEvent = EmployeeMonitoring.Contracts.DlpEvent;
+using AgentConfiguration = EmployeeMonitoring.Contracts.AgentConfiguration;
+using ConsentRecord = EmployeeMonitoring.Contracts.ConsentRecord;
+using Screenshot = EmployeeMonitoring.Contracts.Screenshot;
+using ActivitySample = EmployeeMonitoring.Contracts.ActivitySample;
 
 namespace EmployeeMonitoring.Api.GrpcServices;
 
@@ -147,7 +153,7 @@ public class AgentGrpcService : AgentService.AgentServiceBase
         return _messageQueue.EnqueueDlpEventAsync(agentId, dlpEvent);
     }
 
-    private async Task HandleHeartbeatAsync(string agentId, HeartbeatRequest heartbeat)
+    private async Task HandleHeartbeatAsync(string agentId, Heartbeat heartbeat)
     {
         var agent = await _agentRepository.GetByAgentIdAsync(agentId);
         if (agent != null)
@@ -185,15 +191,24 @@ public class AgentGrpcService : AgentService.AgentServiceBase
 
     public override Task<ConsentStatus> GetConsentStatus(ConsentRequest request, ServerCallContext context)
     {
-        var consent = _consentRepository.GetByAgentId(request.AgentId).Result;
+        var consent = _consentRepository.GetByAgentIdAsync(request.AgentId).Result;
+        var modules = new List<string>();
+        if (consent != null && !string.IsNullOrWhiteSpace(consent.GrantedModulesJson))
+        {
+            try
+            {
+                modules = System.Text.Json.JsonSerializer.Deserialize<List<string>>(consent.GrantedModulesJson) ?? new List<string>();
+            }
+            catch { /* ignore bad json */ }
+        }
         return Task.FromResult(new ConsentStatus
         {
             ConsentGiven = consent?.ConsentGiven ?? false,
             ConsentTimestamp = consent?.ConsentTimestamp.ToUnixTimeMilliseconds() ?? 0,
             ConsentVersion = consent?.ConsentVersion ?? string.Empty,
-            GrantedModules = { consent?.GrantedModules ?? new List<string>() },
+            GrantedModules = { modules },
             RequiresRenewal = consent?.RequiresRenewal ?? true,
-            RenewalDeadline = consent?.RenewalDeadline.ToUnixTimeMilliseconds() ?? 0
+            RenewalDeadline = consent?.RenewalDeadline?.ToUnixTimeMilliseconds() ?? 0
         });
     }
 
@@ -234,9 +249,9 @@ public class AgentGrpcService : AgentService.AgentServiceBase
 /// </summary>
 public interface IConsentRepository
 {
-    Task<ConsentRecord?> GetByAgentIdAsync(string agentId, CancellationToken cancellationToken = default);
-    Task<ConsentRecord> CreateAsync(ConsentRecord record, CancellationToken cancellationToken = default);
-    Task<ConsentRecord> UpdateAsync(ConsentRecord record, CancellationToken cancellationToken = default);
+    Task<Models.ConsentRecord?> GetByAgentIdAsync(string agentId, CancellationToken cancellationToken = default);
+    Task<Models.ConsentRecord> CreateAsync(Models.ConsentRecord record, CancellationToken cancellationToken = default);
+    Task<Models.ConsentRecord> UpdateAsync(Models.ConsentRecord record, CancellationToken cancellationToken = default);
 }
 
 public class ConsentRepository : IConsentRepository
@@ -248,20 +263,20 @@ public class ConsentRepository : IConsentRepository
         _db = db;
     }
 
-    public async Task<ConsentRecord?> GetByAgentIdAsync(string agentId, CancellationToken cancellationToken = default)
+    public async Task<Models.ConsentRecord?> GetByAgentIdAsync(string agentId, CancellationToken cancellationToken = default)
     {
         return await _db.ConsentRecords
             .FirstOrDefaultAsync(c => c.Agent.AgentId == agentId, cancellationToken);
     }
 
-    public async Task<ConsentRecord> CreateAsync(ConsentRecord record, CancellationToken cancellationToken = default)
+    public async Task<Models.ConsentRecord> CreateAsync(Models.ConsentRecord record, CancellationToken cancellationToken = default)
     {
         _db.ConsentRecords.Add(record);
         await _db.SaveChangesAsync(cancellationToken);
         return record;
     }
 
-    public async Task<ConsentRecord> UpdateAsync(ConsentRecord record, CancellationToken cancellationToken = default)
+    public async Task<Models.ConsentRecord> UpdateAsync(Models.ConsentRecord record, CancellationToken cancellationToken = default)
     {
         _db.ConsentRecords.Update(record);
         await _db.SaveChangesAsync(cancellationToken);
@@ -311,8 +326,7 @@ public class MessageQueueService : IMessageQueueService
                 Blurred = screenshot.Blurred,
                 BlurRegionsJson = System.Text.Json.JsonSerializer.Serialize(screenshot.BlurRegions),
                 ActiveWindowTitle = screenshot.ActiveWindowTitle,
-                ActiveProcessName = screenshot.ActiveProcessName,
-                Productivity = (ProductivityLevel)screenshot.Productivity
+                ActiveProcessName = screenshot.ActiveProcessName
             };
             await repo.CreateAsync(entity);
         }
@@ -323,20 +337,22 @@ public class MessageQueueService : IMessageQueueService
         using var scope = _scopeFactory.CreateScope();
         var repo = scope.ServiceProvider.GetRequiredService<IActivityRepository>();
         
+        var agent = await scope.ServiceProvider.GetRequiredService<IAgentRepository>().GetByAgentIdAsync(agentId);
+        var agentGuid = agent?.Id ?? Guid.Empty;
         var entities = activities.Select(a => new Models.ActivitySample
         {
-            AgentId = (await scope.ServiceProvider.GetRequiredService<IAgentRepository>().GetByAgentIdAsync(agentId))?.Id ?? Guid.Empty,
+            AgentId = agentGuid,
             Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(a.Timestamp),
             DurationSeconds = a.DurationSeconds,
             ProcessName = a.ProcessName,
             WindowTitle = a.WindowTitle,
             WindowClass = a.WindowClass,
             Domain = a.Domain,
-            Productivity = (ProductivityLevel)a.Productivity,
+            Productivity = (Models.ProductivityLevel)(int)a.Productivity,
             IsIdle = a.IsIdle,
             IdleSeconds = a.IdleSeconds,
-            ActiveSeconds = a.ActiveSeconds,
-            InputLevel = (InputActivityLevel)a.InputLevel
+            ActiveSeconds = a.IsIdle ? 0 : a.DurationSeconds,
+            InputLevel = (Models.InputActivityLevel)(int)a.InputLevel
         }).ToList();
 
         await repo.CreateBatchAsync(entities);
@@ -351,11 +367,11 @@ public class MessageQueueService : IMessageQueueService
         {
             AgentId = (await scope.ServiceProvider.GetRequiredService<IAgentRepository>().GetByAgentIdAsync(agentId))?.Id ?? Guid.Empty,
             Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(pauseEvent.Timestamp),
-            Action = (PauseAction)pauseEvent.Action,
+            Action = (Models.PauseAction)(int)pauseEvent.Action,
             Reason = pauseEvent.Reason,
             PauseDurationSeconds = pauseEvent.PauseDurationSeconds,
             AdminNotified = pauseEvent.AdminNotified,
-            AdminNotificationId = pauseEvent.AdminNotificationId
+            AdminNotificationId = null
         };
         await repo.CreateAsync(entity);
     }
@@ -369,8 +385,8 @@ public class MessageQueueService : IMessageQueueService
         {
             AgentId = (await scope.ServiceProvider.GetRequiredService<IAgentRepository>().GetByAgentIdAsync(agentId))?.Id ?? Guid.Empty,
             Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(dlpEvent.Timestamp),
-            Type = (DlpEventType)dlpEvent.Type,
-            Severity = (Severity)dlpEvent.Severity,
+            Type = (Models.DlpEventType)(int)dlpEvent.Type,
+            Severity = (Models.Severity)(int)dlpEvent.Severity,
             ProcessName = dlpEvent.ProcessName,
             FilePath = dlpEvent.FilePath,
             Details = dlpEvent.Details,

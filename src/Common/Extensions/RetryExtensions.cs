@@ -1,5 +1,6 @@
 using Polly;
 using Polly.Retry;
+using Polly.CircuitBreaker;
 
 namespace EmployeeMonitoring.Common.Extensions;
 
@@ -18,7 +19,7 @@ public static class RetryPolicies
         .WaitAndRetryAsync(
             retryCount: 5,
             sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Min(Math.Pow(2, attempt), 60)) + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 1000)),
-            onRetry: (exception, delay, attempt, context) =>
+            onRetry: (exception, delay) =>
             {
                 // Log retry attempt
             });
@@ -30,7 +31,7 @@ public static class RetryPolicies
         .Handle<Exception>()
         .WaitAndRetryForeverAsync(
             sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Min(Math.Pow(2, attempt), 300)) + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 5000)),
-            onRetry: (exception, delay, attempt, context) =>
+            onRetry: (exception, delay) =>
             {
                 // Log critical retry
             });
@@ -44,7 +45,7 @@ public static class RetryPolicies
         .WaitAndRetryAsync(
             retryCount: 3,
             sleepDurationProvider: attempt => TimeSpan.FromMilliseconds(500 * Math.Pow(2, attempt)),
-            onRetry: (exception, delay, attempt, context) => { });
+            onRetry: (exception, delay) => { });
 
     /// <summary>
     /// Circuit breaker for external dependencies.

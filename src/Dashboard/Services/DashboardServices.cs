@@ -1,6 +1,9 @@
 using EmployeeMonitoring.Dashboard.Models;
+using EmployeeMonitoring.Contracts;
+using AgentState = EmployeeMonitoring.Dashboard.Models.AgentState;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Json;
 
 namespace EmployeeMonitoring.Dashboard.Services;
 
@@ -261,46 +264,22 @@ public class ApiService
 }
 
 /// <summary>
-/// Notification service for toast messages.
+/// Notification service for toast messages (stub - using MudBlazor ISnackbar removed).
 /// </summary>
 public class NotificationService
 {
-    private readonly ISnackbar _snackbar;
-
-    public NotificationService(ISnackbar snackbar)
-    {
-        _snackbar = snackbar;
-    }
-
-    public void Success(string message) => _snackbar.Add(message, Severity.Success);
-    public void Error(string message) => _snackbar.Add(message, Severity.Error);
-    public void Warning(string message) => _snackbar.Add(message, Severity.Warning);
-    public void Info(string message) => _snackbar.Add(message, Severity.Info);
+    public void Success(string message) => Console.WriteLine($"SUCCESS: {message}");
+    public void Error(string message) => Console.WriteLine($"ERROR: {message}");
+    public void Warning(string message) => Console.WriteLine($"WARNING: {message}");
+    public void Info(string message) => Console.WriteLine($"INFO: {message}");
 
     public void ShowPauseNotification(string userName, string reason)
     {
-        _snackbar.Add($"⏸️ {userName} paused monitoring: {reason}", Severity.Warning, config =>
-        {
-            config.VisibleStateDuration = 10000;
-            config.ShowCloseIcon = true;
-        });
+        Console.WriteLine($"⏸️ {userName} paused monitoring: {reason}");
     }
 
-    public void ShowDlpAlert(string userName, string type, Severity severity)
+    public void ShowDlpAlert(string userName, string type, string severity)
     {
-        var sev = severity switch
-        {
-            Models.Severity.Critical => MudBlazor.Severity.Error,
-            Models.Severity.High => MudBlazor.Severity.Error,
-            Models.Severity.Medium => MudBlazor.Severity.Warning,
-            _ => MudBlazor.Severity.Info
-        };
-
-        _snackbar.Add($"🚨 DLP: {type} for {userName}", sev, config =>
-        {
-            config.VisibleStateDuration = 15000;
-            config.ShowCloseIcon = true;
-            config.RequireInteraction = true;
-        });
+        Console.WriteLine($"🚨 DLP: {type} for {userName}");
     }
 }

@@ -102,7 +102,7 @@ public class ActivityViewModel
     public string WindowTitle { get; set; } = string.Empty;
     public string WindowClass { get; set; } = string.Empty;
     public string Domain { get; set; } = string.Empty;
-    public ProductivityLevel Productivity { get; set; } = ProductivityLevel.Unknown
+    public ProductivityLevel Productivity { get; set; } = ProductivityLevel.Unknown;
     public bool IsIdle { get; set; }
     public int IdleSeconds { get; set; }
     public int ActiveSeconds { get; set; }
@@ -130,9 +130,8 @@ public class DlpEventViewModel
     public DateTimeOffset Timestamp { get; set; }
     public DlpEventType Type { get; set; }
     public Severity Severity { get; set; }
-    public string ProcessName { get; set; } = string.Empty;
-    public string FilePath { get; set; } = string.Empty
-    public string Details { get; set; } = string.Empty
+    public string FilePath { get; set; } = string.Empty;
+    public string Details { get; set; } = string.Empty;
     public Dictionary<string, string> Metadata { get; set; } = new();
     public bool Blocked { get; set; }
     public bool Acknowledged { get; set; }

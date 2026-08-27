@@ -298,7 +298,7 @@ message ActivitySample {
 }
 
 enum ProductivityLevel {
-  UNKNOWN = 0;
+  PRODUCTIVITY_UNKNOWN = 0;
   PRODUCTIVE = 1;
   NEUTRAL = 2;
   DISTRACTING = 3;
@@ -306,9 +306,9 @@ enum ProductivityLevel {
 
 enum InputActivityLevel {
   NONE = 0;
-  LOW = 1;
+  INPUT_ACTIVITY_LOW = 1;
   MODERATE = 2;
-  HIGH = 3;
+  INPUT_ACTIVITY_HIGH = 3;
 }
 
 // ============================================================================
@@ -377,9 +377,9 @@ enum DlpEventType {
 
 enum Severity {
   INFO = 0;
-  LOW = 1;
+  SEVERITY_LOW = 1;
   MEDIUM = 2;
-  HIGH = 3;
+  SEVERITY_HIGH = 3;
   CRITICAL = 4;
 }
 
@@ -458,4 +458,18 @@ message Acknowledgement {
   string original_correlation_id = 1;
   bool success = 2;
   string message = 3;
+}
+
+// Heartbeat message (referenced in AgentMessage)
+message Heartbeat {
+  string agent_id = 1;
+  int64 timestamp = 2;
+  AgentHealth health = 3;
+}
+
+// Consent acknowledgement
+message ConsentAck {
+  string consent_id = 1;
+  bool acknowledged = 2;
+  int64 timestamp = 3;
 }

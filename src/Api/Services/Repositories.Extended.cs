@@ -91,7 +91,7 @@ public interface IActivityRepository
     Task<ActivitySample> CreateAsync(ActivitySample sample, CancellationToken cancellationToken = default);
     Task<int> CreateBatchAsync(List<ActivitySample> samples, CancellationToken cancellationToken = default);
     Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default);
-    Task<ActivitySummary> GetSummaryAsync(Guid agentId, DateTimeOffset startTime, DateTimeOffset endTime, CancellationToken cancellationToken = default);
+    Task<ActivitySummaryDto> GetSummaryAsync(Guid agentId, DateTimeOffset startTime, DateTimeOffset endTime, CancellationToken cancellationToken = default);
 }
 
 public class ActivityRepository : IActivityRepository
@@ -140,7 +140,7 @@ public class ActivityRepository : IActivityRepository
         return toDelete.Count;
     }
 
-    public async Task<ActivitySummary> GetSummaryAsync(Guid agentId, DateTimeOffset startTime, DateTimeOffset endTime, CancellationToken cancellationToken = default)
+    public async Task<ActivitySummaryDto> GetSummaryAsync(Guid agentId, DateTimeOffset startTime, DateTimeOffset endTime, CancellationToken cancellationToken = default)
     {
         var samples = await _db.ActivitySamples
             .Where(s => s.AgentId == agentId && s.Timestamp >= startTime && s.Timestamp <= endTime)
@@ -160,7 +160,7 @@ public class ActivityRepository : IActivityRepository
             .GroupBy(s => s.Productivity.ToString())
             .ToDictionary(g => g.Key, g => g.Sum(s => s.DurationSeconds));
 
-        return new ActivitySummary
+        return new ActivitySummaryDto
         {
             AgentId = agentId,
             StartTime = startTime,
@@ -177,7 +177,7 @@ public class ActivityRepository : IActivityRepository
     }
 }
 
-public class ActivitySummary
+public class ActivitySummaryDto
 {
     public Guid AgentId { get; set; }
     public DateTimeOffset StartTime { get; set; }
@@ -202,7 +202,7 @@ public interface IDlpRepository
     Task<DlpEvent> CreateAsync(DlpEvent dlpEvent, CancellationToken cancellationToken = default);
     Task<DlpEvent> UpdateAsync(DlpEvent dlpEvent, CancellationToken cancellationToken = default);
     Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default);
-    Task<DlpStatistics> GetStatisticsAsync(Guid? agentId = null, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken cancellationToken = default);
+    Task<DlpStatisticsDto> GetStatisticsAsync(Guid? agentId = null, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken cancellationToken = default);
 }
 
 public class DlpRepository : IDlpRepository
@@ -273,7 +273,7 @@ public class DlpRepository : IDlpRepository
         return toDelete.Count;
     }
 
-    public async Task<DlpStatistics> GetStatisticsAsync(Guid? agentId = null, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken cancellationToken = default)
+    public async Task<DlpStatisticsDto> GetStatisticsAsync(Guid? agentId = null, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken cancellationToken = default)
     {
         var query = _db.DlpEvents.AsQueryable();
 
@@ -288,7 +288,7 @@ public class DlpRepository : IDlpRepository
 
         var events = await query.ToListAsync(cancellationToken);
 
-        return new DlpStatistics
+        return new DlpStatisticsDto
         {
             TotalEvents = events.Count,
             ByType = events.GroupBy(e => e.Type).ToDictionary(g => g.Key, g => g.Count()),
@@ -317,7 +317,7 @@ public class DlpRepository : IDlpRepository
     }
 }
 
-public class DlpStatistics
+public class DlpStatisticsDto
 {
     public int TotalEvents { get; set; }
     public Dictionary<DlpEventType, int> ByType { get; set; } = new();
@@ -348,7 +348,7 @@ public interface IPauseEventRepository
 {
     Task<List<PauseEvent>> GetByAgentAsync(Guid agentId, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, PauseAction? action = null, int limit = 100, CancellationToken cancellationToken = default);
     Task<PauseEvent> CreateAsync(PauseEvent pauseEvent, CancellationToken cancellationToken = default);
-    Task<PauseStatistics> GetStatisticsAsync(IEnumerable<Guid>? agentIds = null, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken cancellationToken = default);
+    Task<PauseStatisticsDto> GetStatisticsAsync(IEnumerable<Guid>? agentIds = null, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken cancellationToken = default);
 }
 
 public class PauseEventRepository : IPauseEventRepository
@@ -386,7 +386,7 @@ public class PauseEventRepository : IPauseEventRepository
         return pauseEvent;
     }
 
-    public async Task<PauseStatistics> GetStatisticsAsync(IEnumerable<Guid>? agentIds = null, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken cancellationToken = default)
+    public async Task<PauseStatisticsDto> GetStatisticsAsync(IEnumerable<Guid>? agentIds = null, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken cancellationToken = default)
     {
         var query = _db.PauseEvents.AsQueryable();
 
@@ -404,7 +404,7 @@ public class PauseEventRepository : IPauseEventRepository
         var totalDuration = events.Where(e => e.Action == PauseAction.Resumed).Sum(e => (long)e.PauseDurationSeconds);
         var pauseEvents = events.Where(e => e.Action == PauseAction.Paused).ToList();
 
-        return new PauseStatistics
+        return new PauseStatisticsDto
         {
             TotalPauseEvents = pauseEvents.Count,
             TotalPauseDurationSeconds = totalDuration,
@@ -433,7 +433,7 @@ public class PauseEventRepository : IPauseEventRepository
     }
 }
 
-public class PauseStatistics
+public class PauseStatisticsDto
 {
     public int TotalPauseEvents { get; set; }
     public long TotalPauseDurationSeconds { get; set; }

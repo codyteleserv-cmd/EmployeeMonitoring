@@ -1,44 +1,38 @@
 using EmployeeMonitoring.Dashboard.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.AspNetCore.SignalR.Client;
 using MudBlazor.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
-builder.RootComponents.Add<App>("#app");
+builder.RootComponents.Add<EmployeeMonitoring.Dashboard.App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // Configuration
-builder.Services.AddScoped(sp => new HttpClient 
-{ 
-    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) 
+builder.Services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
 });
 
 // SignalR
-builder.Services.AddSingleton<HubConnectionBuilder>(sp => new HubConnectionBuilder()
-    .WithUrl($"{builder.HostEnvironment.BaseAddress}hubs/admin", options =>
-    {
-        options.AccessTokenProvider = () => Task.FromResult<string?>(sp.GetRequiredService<AuthService>().GetToken());
-    })
-    .WithAutomaticReconnect()
-    .Build());
-
-// gRPC
-builder.Services.AddGrpcClient<AdminService.AdminServiceClient>(options =>
+builder.Services.AddSingleton<HubConnection>(sp =>
 {
-    options.Address = new Uri(builder.HostEnvironment.BaseAddress);
-})
-.ConfigureChannel(options =>
-{
-    options.Credentials = ChannelCredentials.Insecure; // Use secure in production
+    var hubBuilder = new HubConnectionBuilder()
+        .WithUrl($"{builder.HostEnvironment.BaseAddress}hubs/admin", options =>
+        {
+            options.AccessTokenProvider = () => Task.FromResult<string?>(sp.GetRequiredService<AuthService>().GetToken());
+        })
+        .WithAutomaticReconnect();
+    return hubBuilder.Build();
 });
 
 // Services
 builder.Services.AddMudServices();
 builder.Services.AddSingleton<AdminHubService>();
 builder.Services.AddSingleton<AgentStateService>();
-builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<ApiService>();
-builder.Services.AddScoped<NotificationService>();
+builder.Services.AddSingleton<AuthService>();
+builder.Services.AddSingleton<ApiService>();
+builder.Services.AddSingleton<NotificationService>();
 
 // Authorization
 builder.Services.AddAuthorizationCore();

@@ -1,15 +1,14 @@
 @inject NavigationManager Navigation
-@inject AgentStateService AgentState
-@inject AuthService Auth
+@using Microsoft.AspNetCore.Components
+@using MudBlazor
 
 <MudNavMenu>
     <MudNavGroup Title="Overview" Expanded="true">
-        <MudNavLink Match="NavLinkMatch.All" Href="/">
+        <MudNavLink Href="/">
             <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Dashboard" /> Dashboard
         </MudNavLink>
         <MudNavLink Href="/agents">
             <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Computer" /> Agents
-            <MudBadge Color="Color.Secondary" Size="Size.Small" Class="ms-2">@AgentState.OnlineCount</MudBadge>
         </MudNavLink>
     </MudNavGroup>
 
@@ -22,7 +21,6 @@
         </MudNavLink>
         <MudNavLink Href="/dlp">
             <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Security" /> DLP Events
-            <MudBadge Color="Color.Error" Size="Size.Small" Class="ms-2">@AgentState.UnacknowledgedDlpCount</MudBadge>
         </MudNavLink>
     </MudNavGroup>
 
@@ -52,16 +50,4 @@
             <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Assessment" /> Reports
         </MudNavLink>
     </MudNavGroup>
-
-    @if (Auth.IsAdmin)
-    {
-        <MudNavGroup Title="Administration" Expanded="false">
-            <MudNavLink Href="/admin/roles">
-                <MudIcon Icon="@MudBlazor.Icons.Material.Filled.AdminPanelSettings" /> Roles
-            </MudNavLink>
-            <MudNavLink Href="/admin/integrations">
-                <MudIcon Icon="@MudBlazor.Icons.Material.Filled.IntegrationInstructions" /> Integrations
-            </MudNavLink>
-        </MudNavGroup>
-    }
 </MudNavMenu>

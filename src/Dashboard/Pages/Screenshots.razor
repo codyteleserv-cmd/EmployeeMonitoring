@@ -1,136 +1,28 @@
 @page "/screenshots"
-
 <PageTitle>Screenshots</PageTitle>
 
-<MudGrid Class="mt-4">
-    <MudItem xs="12" md="4">
-        <MudCard>
-            <MudCardContent>
-                <MudText Typo="Typo.h6" Class="mb-3">Filters</MudText>
-                
-                <MudForm>
-                    <MudGrid>
-                        <MudItem xs="12">
-                            <MudAutocomplete T="AgentViewModel" Label="Agent" @bind-Value="@_selectedAgent" 
-                                             SearchFunc="@SearchAgents" ToStringFunc="@(a => a?.DeviceName ?? "")" 
-                                             Clearable="true" ResetValueOnEmptyText="true" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudDatePicker Label="From Date" @bind-Date="@_fromDate" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudDatePicker Label="To Date" @bind-Date="@_toDate" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudSwitch @bind-Checked="@_includeBlurred" Label="Include blurred" Color="Color.Primary" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadScreenshots" Class="w-100">
-                                <MudIcon Icon="@MudBlazor.Icons.Material.Filled.Search" /> Load
-                            </MudButton>
-                        </MudItem>
-                    </MudGrid>
-                </MudForm>
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
+@using EmployeeMonitoring.Dashboard.Models
+@using EmployeeMonitoring.Dashboard.Services
+@using MudBlazor
 
-    <MudItem xs="12" md="8">
-        <MudCard Class="h-100">
+<MudGrid Class="mt-4">
+    <MudItem xs="12">
+        <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">Screenshots (@_screenshots.Count)</MudText>
+                <MudText Typo="Typo.h6">Screenshots</MudText>
             </MudCardHeader>
             <MudCardContent>
-                @if (_loading)
-                {
-                    <MudProgressLinear Indeterminate="true" />
-                }
-                else if (_screenshots.Count == 0)
-                {
-                    <MudText Typo="Typo.body1" Class="text-secondary" Align="Align.Center">No screenshots found</MudText>
-                }
-                else
-                {
-                    <div class="screenshot-grid">
-                        @foreach (var screenshot in _screenshots)
-                        {
-                            <ScreenshotThumbnail Screenshot="@screenshot" OnClick="@(() => SelectScreenshot(screenshot))" 
-                                                 Selected="@(_selectedScreenshot?.Id == screenshot.Id)" />
-                        }
-                    </div>
-                }
+                <MudText>Screenshot monitoring feature coming in next release.</MudText>
+                <MudProgressLinear Indeterminate="true" Class="mt-3" />
             </MudCardContent>
         </MudCard>
     </MudItem>
-
-    @if (_selectedScreenshot != null)
-    {
-        <MudItem xs="12">
-            <MudCard Class="mt-4">
-                <MudCardHeader>
-                    <MudText Typo="Typo.h6">@_selectedScreenshot.ActiveWindowTitle</MudText>
-                    <MudText Typo="Typo.body2" Class="text-secondary">
-                        @_selectedScreenshot.AgentName • @_selectedScreenshot.CapturedAt.ToString("yyyy-MM-dd HH:mm:ss") • 
-                        @_selectedScreenshot.Width x @_selectedScreenshot.Height • @_selectedScreenshot.Format
-                    </MudText>
-                </MudCardHeader>
-                <MudCardContent>
-                    <div class="screenshot-preview">
-                        <img src="@(_selectedScreenshot.FullImageBase64 ?? _selectedScreenshot.ThumbnailBase64)" 
-                             alt="Screenshot" style="max-width: 100%; height: auto;" />
-                    </div>
-                    
-                    <MudDivider Class="my-3" />
-                    
-                    <MudText Typo="Typo.h6">Blur Regions</MudText>
-                    @foreach (var region in _selectedScreenshot.BlurRegions)
-                    {
-                        <MudChip Color="Color.Warning" Size="Size.Small" Class="me-2 mb-1">
-                            @region.Reason: (@region.X, @region.Y) @region.Width x @region.Height
-                        </MudChip>
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    }
 </MudGrid>
 
 @code {
-    [Inject] AgentStateService AgentState { get; set; } = default!;
     [Inject] ApiService ApiService { get; set; } = default!;
+    [Inject] EmployeeMonitoring.Dashboard.Services.AgentStateService AgentState { get; set; } = default!;
 
     private List<ScreenshotViewModel> _screenshots = new();
     private ScreenshotViewModel? _selectedScreenshot;
-    private AgentViewModel? _selectedAgent;
-    private DateTime? _fromDate = DateTime.Today.AddDays(-1);
-    private DateTime? _toDate = DateTime.Today;
-    private bool _includeBlurred = true;
-    private bool _loading = false;
-
-    private async Task LoadScreenshots()
-    {
-        _loading = true;
-        try
-        {
-            // In production, call API with filters
-            // _screenshots = await ApiService.GetAsync<List<ScreenshotViewModel>>(...);
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
-
-    private async Task<IEnumerable<AgentViewModel>> SearchAgents(string value)
-    {
-        return AgentState.Agents.Values
-            .Where(a => a.DeviceName.Contains(value, StringComparison.OrdinalIgnoreCase) ||
-                       a.UserName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(10);
-    }
-
-    private void SelectScreenshot(ScreenshotViewModel screenshot)
-    {
-        _selectedScreenshot = screenshot;
-    }
 }

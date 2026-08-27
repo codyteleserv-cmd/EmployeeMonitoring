@@ -14,12 +14,12 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" Version="3.27.2" />
+    <PackageReference Include="Grpc.Core.Api" Version="2.62.0" />
     <PackageReference Include="Grpc.Tools" Version="2.62.1" PrivateAssets="All" />
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="Protos\*.proto" GrpcServices="Both" />
+    <Protobuf Include="Protos\*.proto" GrpcServices="Both" ProtoRoot="Protos" />
   </ItemGroup>
-
 </Project>

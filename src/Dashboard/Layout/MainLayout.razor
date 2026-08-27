@@ -1,7 +1,13 @@
 @inherits LayoutComponentBase
+@using EmployeeMonitoring.Dashboard.Services
+@using EmployeeMonitoring.Dashboard.Models
+@using EmployeeMonitoring.Contracts
+@inject ApiService Api
+@inject NavigationManager Nav
 @inject AdminHubService HubService
-@inject AgentStateService AgentState
-@inject AuthService Auth
+@inject AgentStateService AgentStateService
+@inject NotificationService Notify
+@using MudBlazor
 
 <MudLayout>
     <MudAppBar Elevation="1" Class="shadow-sm">
@@ -9,14 +15,11 @@
         <MudSpacer />
         <MudText Typo="Typo.h6" Class="mx-auto">Employee Monitoring Dashboard</MudText>
         <MudSpacer />
-        <MudAvatar Image="@Auth.User?.Avatar" Class="me-2">
-            @Auth.User?.Initials
-        </MudAvatar>
-        <MudText Typo="Typo.body2" Class="me-4">@Auth.User?.Name</MudText>
+        <MudText Typo="Typo.body2" Class="mx-auto">Employee Monitoring</MudText>
         <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.Logout" OnClick="@Logout" />
     </MudAppBar>
 
-    <MudDrawer @bind-Open="@_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+    <MudDrawer ClipMode="DrawerClipMode.Always" Elevation="2">
         <NavMenu />
     </MudDrawer>
 
@@ -34,13 +37,13 @@
 
     private void Logout()
     {
-        Auth.Logout();
-        NavigationManager.NavigateTo("/login", forceLoad: true);
+        Nav.NavigateTo("/login", forceLoad: true);
     }
 
     protected override async Task OnInitializedAsync()
     {
         await HubService.InitializeAsync();
-        await AgentState.InitializeAsync();
+        await AgentStateService.InitializeAsync();
     }
+}
 }

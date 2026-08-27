@@ -4,6 +4,8 @@ package EmployeeMonitoring.Contracts;
 
 option csharp_namespace = "EmployeeMonitoring.Contracts";
 
+import "agent.proto";
+
 // ============================================================================
 // Admin Dashboard ↔ API Communication
 // ============================================================================
@@ -97,9 +99,9 @@ message AgentStatusUpdate {
 }
 
 enum AgentState {
-  UNKNOWN = 0;
+  AGENT_UNKNOWN = 0;
   ONLINE = 1;
-  PAUSED = 2;
+  AGENT_PAUSED = 2;
   OFFLINE = 3;
   UNREGISTERED = 4;
   ERROR = 5;
@@ -109,7 +111,7 @@ enum HealthStatus {
   HEALTHY = 0;
   DEGRADED = 1;
   UNHEALTHY = 2;
-  UNKNOWN = 3;
+  HEALTH_UNKNOWN = 3;
 }
 
 message WatchAgentDetailsRequest {
@@ -119,11 +121,11 @@ message WatchAgentDetailsRequest {
 message AgentDetailUpdate {
   string agent_id = 1;
   oneof update {
-    ScreenshotData screenshot = 1;
-    ActivitySample activity = 2;
-    PauseEventRecord pauseEvent = 3;
-    DlpEventRecord dlpEvent = 4;
-    HealthStatus health = 5;
+    ScreenshotData screenshot = 2;
+    ActivitySample activity = 3;
+    PauseEventRecord pauseEvent = 4;
+    DlpEventRecord dlpEvent = 5;
+    HealthStatus health = 6;
   }
 }
 
@@ -406,8 +408,8 @@ message DlpStatistics {
   int64 start_time = 1;
   int64 end_time = 2;
   int32 total_events = 3;
-  map<DlpEventType, int32> by_type = 4;
-  map<Severity, int32> by_severity = 5;
+  map<string, int32> by_type = 4; // key: DlpEventType name
+  map<string, int32> by_severity = 5; // key: Severity name
   int32 blocked_count = 6;
   int32 acknowledged_count = 7;
   repeated TopDlpSource top_sources = 8;
@@ -663,7 +665,7 @@ enum AuditAction {
   VIEW_DLP_EVENT = 4;
   PAUSE_AGENT = 5;
   RESUME_AGENT = 6;
-  FORCE_RESUME = 7;
+  AUDIT_FORCE_RESUME = 7;
   UPDATE_CONFIG = 8;
   DEPLOY_CONFIG = 9;
   ACKNOWLEDGE_DLP = 10;
@@ -779,10 +781,10 @@ enum AlertType {
 }
 
 enum AlertSeverity {
-  INFO = 0;
-  WARNING = 1;
-  HIGH = 2;
-  CRITICAL = 3;
+  ALERT_INFO = 0;
+  ALERT_WARNING = 1;
+  ALERT_HIGH = 2;
+  ALERT_CRITICAL = 3;
 }
 
 message AcknowledgeAlertRequest {
@@ -856,12 +858,12 @@ message AlertRule {
 }
 
 enum NotificationChannel {
-  EMAIL = 0;
-  TEAMS = 1;
-  SLACK = 2;
-  WEBHOOK = 3;
-  SMS = 4;
-  IN_APP = 5;
+  CHANNEL_EMAIL = 0;
+  CHANNEL_TEAMS = 1;
+  CHANNEL_SLACK = 2;
+  CHANNEL_WEBHOOK = 3;
+  CHANNEL_SMS = 4;
+  CHANNEL_IN_APP = 5;
 }
 
 // ============================================================================
@@ -871,7 +873,7 @@ enum NotificationChannel {
 message GenerateReportRequest {
   ReportType type = 1;
   int64 start_time = 2;
-  int64 end_time = 3.
+  int64 end_time = 3;
   repeated string agent_ids = 4;
   repeated string group_ids = 5;
   repeated string department_ids = 6;
@@ -882,14 +884,14 @@ message GenerateReportRequest {
 message ReportJob {
   string job_id = 1;
   ReportType type = 2;
-  ReportStatus status = 3.
-  int64 created_at = 4.
-  int64 started_at = 5.
-  int64 completed_at = 6.
-  double progress = 7.
-  string download_url = 8.
-  int64 expires_at = 9.
-  string error_message = 10.
+  ReportStatus status = 3;
+  int64 created_at = 4;
+  int64 started_at = 5;
+  int64 completed_at = 6;
+  double progress = 7;
+  string download_url = 8;
+  int64 expires_at = 9;
+  string error_message = 10;
 }
 
 enum ReportType {
@@ -899,7 +901,7 @@ enum ReportType {
   COMPLIANCE = 3;
   AGENT_HEALTH = 4;
   USER_ACTIVITY = 5;
-  CUSTOM = 6;
+  REPORT_CUSTOM = 6;
 }
 
 enum ReportStatus {
@@ -907,19 +909,19 @@ enum ReportStatus {
   RUNNING = 1;
   COMPLETED = 2;
   FAILED = 3;
-  EXPIRED = 4;
+  REPORT_EXPIRED = 4;
 }
 
 message GetReportStatusRequest {
-  string job_id = 1.
+  string job_id = 1;
 }
 
 message DownloadReportRequest {
-  string job_id = 1.
-  int32 chunk_size = 2. // KB
+  string job_id = 1;
+  int32 chunk_size = 2; // KB
 }
 
 message ReportChunk {
-  bytes data = 1.
-  bool is_final = 2.
+  bytes data = 1;
+  bool is_final = 2;
 }

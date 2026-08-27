@@ -1,4 +1,5 @@
 using EmployeeMonitoring.Api.Services;
+using EmployeeMonitoring.Contracts;
 using Microsoft.AspNetCore.SignalR;
 
 namespace EmployeeMonitoring.Api.Hubs;

@@ -1,3 +1,4 @@
+using EmployeeMonitoring.Api.Hubs;
 using EmployeeMonitoring.Api.Models;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
@@ -88,6 +89,7 @@ public class AgentConnectionManager : IAgentConnectionManager
 public interface IAdminConnectionManager
 {
     Task RegisterAdminAsync(string adminId, string connectionId, CancellationToken cancellationToken = default);
+    Task RegisterAdminWithRoleAsync(string adminId, string connectionId, string role, CancellationToken cancellationToken = default);
     Task UnregisterAdminAsync(string adminId, CancellationToken cancellationToken = default);
     bool IsConnected(string adminId);
     Task SendToAdminAsync(string adminId, string method, object payload, CancellationToken cancellationToken = default);

@@ -1,172 +1,54 @@
 @page "/"
-@inject AgentStateService AgentState
-@inject AdminHubService HubService
-@inject NavigationManager Navigation
-
+@using EmployeeMonitoring.Dashboard.Models
+@using EmployeeMonitoring.Dashboard.Services
+@using EmployeeMonitoring.Contracts
+@using MudBlazor
 <PageTitle>Dashboard</PageTitle>
 
 <MudGrid Class="mt-4">
     <!-- Stats Cards -->
     <MudItem xs="12" sm="6" md="3">
-        <StatCard Title="Total Agents" Value="@AgentState.TotalAgents" Icon="@MudBlazor.Icons.Material.Filled.Computer" Color="Color.Primary" />
+        <StatCard Title="Total Agents" Value="0" Icon="@MudBlazor.Icons.Material.Filled.Computer" Color="MudBlazor.Severity.Primary" />
     </MudItem>
     <MudItem xs="12" sm="6" md="3">
-        <StatCard Title="Online" Value="@AgentState.OnlineCount" Icon="@MudBlazor.Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+        <StatCard Title="Online" Value="0" Icon="@MudBlazor.Icons.Material.Filled.CheckCircle" Color="MudBlazor.Severity.Success" />
     </MudItem>
     <MudItem xs="12" sm="6" md="3">
-        <StatCard Title="Paused" Value="@AgentState.PausedCount" Icon="@MudBlazor.Icons.Material.Filled.PauseCircle" Color="Color.Warning" />
+        <StatCard Title="Paused" Value="0" Icon="@MudBlazor.Icons.Material.Filled.PauseCircle" Color="MudBlazor.Severity.Warning" />
     </MudItem>
     <MudItem xs="12" sm="6" md="3">
-        <StatCard Title="Offline" Value="@AgentState.OfflineCount" Icon="@MudBlazor.Icons.Material.Filled.Offline" Color="Color.Error" />
+        <StatCard Title="Offline" Value="0" Icon="@MudBlazor.Icons.Material.Filled.OfflinePin" Color="MudBlazor.Severity.Error" />
     </MudItem>
 
     <!-- DLP Stats -->
     <MudItem xs="12" sm="6" md="3">
-        <StatCard Title="DLP Events (24h)" Value="@AgentState.DlpEvents24h" Icon="@MudBlazor.Icons.Material.Filled.Security" Color="Color.Error" />
+        <StatCard Title="DLP Events (24h)" Value="0" Icon="@MudBlazor.Icons.Material.Filled.Security" Color="MudBlazor.Severity.Error" />
     </MudItem>
     <MudItem xs="12" sm="6" md="3">
-        <StatCard Title="Unacknowledged" Value="@AgentState.UnacknowledgedDlpCount" Icon="@MudBlazor.Icons.Material.Filled.Warning" Color="Color.Warning" />
+        <StatCard Title="Unacknowledged" Value="0" Icon="@MudBlazor.Icons.Material.Filled.Warning" Color="MudBlazor.Severity.Warning" />
     </MudItem>
     <MudItem xs="12" sm="6" md="3">
-        <StatCard Title="Avg Productivity" Value="@($"{AgentState.AvgProductivity:F1}%")" Icon="@MudBlazor.Icons.Material.Filled.TrendingUp" Color="Color.Info" />
+        <StatCard Title="Avg Productivity" Value="0%" Icon="@MudBlazor.Icons.Material.Filled.TrendingUp" Color="MudBlazor.Severity.Info" />
     </MudItem>
     <MudItem xs="12" sm="6" md="3">
-        <StatCard Title="Pause Time Today" Value="@AgentState.TotalPauseMinutesToday" Icon="@MudBlazor.Icons.Material.Filled.Timer" Color="Color.Secondary" Unit="min" />
-    </MudItem>
-
-    <!-- Real-time Agent Grid -->
-    <MudItem xs="12">
-        <MudCard Class="mt-4">
-            <MudCardHeader>
-                <MudText Typo="Typo.h6">Agents Overview</MudText>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudDataGrid Items="@AgentState.Agents" Filter="FilterFunc" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" 
-                              Sortable="true" SortMode="SortMode.Multiple" PageSize="10" PageSizeOptions="new int[]{10, 25, 50}" 
-                              Dense="true" Hover="true" Striped="true" Bordered="true">
-                    <Columns>
-                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.AgentId)" Title="Agent ID" Width="150px" />
-                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.DeviceName)" Title="Device" Width="200px" />
-                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.UserName)" Title="User" Width="150px" />
-                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.Department)" Title="Department" Width="150px" />
-                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.Status)" Title="Status" Width="100px">
-                            <CellTemplate Context="agent">
-                                <MudChip Color="@GetStatusColor(agent.Status)" Size="Size.Small">@agent.Status</MudChip>
-                            </CellTemplate>
-                        </Column>
-                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.IsPaused)" Title="Paused" Width="80px">
-                            <CellTemplate Context="agent">
-                                <MudIcon Icon="@(agent.IsPaused ? MudBlazor.Icons.Material.Filled.PauseCircle : MudBlazor.Icons.Material.Filled.PlayCircle)" 
-                                         Color="@(agent.IsPaused ? Color.Warning : Color.Success)" Size="Size.Small" />
-                            </CellTemplate>
-                        </Column>
-                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.Health)" Title="Health" Width="100px">
-                            <CellTemplate Context="agent">
-                                <MudChip Color="@GetHealthColor(agent.Health)" Size="Size.Small">@agent.Health</MudChip>
-                            </CellTemplate>
-                        </Column>
-                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.LastHeartbeat)" Title="Last Heartbeat" Width="150px">
-                            <CellTemplate Context="agent">
-                                @agent.LastHeartbeat?.ToString("HH:mm:ss") ?? "Never"
-                            </CellTemplate>
-                        </Column>
-                        <Column T="AgentViewModel" Field="@nameof(AgentViewModel.PauseMinutesToday)" Title="Pause (min)" Width="100px" />
-                        <Column T="AgentViewModel" Title="Actions" Width="120px">
-                            <CellTemplate Context="agent">
-                                <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.Visibility" Size="Size.Small" 
-                                               OnClick="@(() => ViewAgent(agent.AgentId))" />
-                                @if (agent.IsPaused)
-                                {
-                                    <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.PlayArrow" Size="Size.Small" Color="Color.Success"
-                                                   OnClick="@(() => ResumeAgent(agent.AgentId))" />
-                                }
-                                else if (AgentState.CanPause(agent.AgentId))
-                                {
-                                    <MudIconButton Icon="@MudBlazor.Icons.Material.Filled.Pause" Size="Size.Small" Color="Color.Warning"
-                                                   OnClick="@(() => PauseAgent(agent.AgentId))" />
-                                }
-                            </CellTemplate>
-                        </Column>
-                    </Columns>
-                    <PagerContent>
-                        <MudDataGridPager PageSizeOptions="new int[]{10, 25, 50}" />
-                    </PagerContent>
-                </MudDataGrid>
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
-
-    <!-- Productivity Chart -->
-    <MudItem xs="12" md="6">
-        <MudCard Class="mt-4">
-            <MudCardHeader>
-                <MudText Typo="Typo.h6">Productivity Trend (24h)</MudText>
-            </MudCardHeader>
-            <MudCardContent>
-                <ProductivityChart Data="@AgentState.ProductivityTrend" />
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
-
-    <!-- DLP Events Chart -->
-    <MudItem xs="12" md="6">
-        <MudCard Class="mt-4">
-            <MudCardHeader>
-                <MudText Typo="Typo.h6">DLP Events by Type (24h)</MudText>
-            </MudCardHeader>
-            <MudCardContent>
-                <DlpChart Data="@AgentState.DlpEventsByType" />
-            </MudCardContent>
-        </MudCard>
+        <StatCard Title="Pause Time Today" Value="0 min" Icon="@MudBlazor.Icons.Material.Filled.Timer" Color="MudBlazor.Severity.Secondary" Unit="min" />
     </MudItem>
 </MudGrid>
 
 @code {
-    private bool FilterFunc(AgentViewModel agent) => true;
-
-    private Color GetStatusColor(AgentState state) => state switch
+    private MudBlazor.Severity GetStatusColor(string status) => status switch
     {
-        AgentState.Online => Color.Success,
-        AgentState.Paused => Color.Warning,
-        AgentState.Offline => Color.Error,
-        _ => Color.Default
+        "Online" => MudBlazor.Severity.Success,
+        "Paused" => MudBlazor.Severity.Warning,
+        "Offline" => MudBlazor.Severity.Error,
+        _ => MudBlazor.Severity.Info
     };
 
-    private Color GetHealthColor(HealthStatus health) => health switch
+    private MudBlazor.Severity GetHealthColor(string health) => health switch
     {
-        HealthStatus.Healthy => Color.Success,
-        HealthStatus.Degraded => Color.Warning,
-        HealthStatus.Unhealthy => Color.Error,
-        _ => Color.Default
+        "Healthy" => MudBlazor.Severity.Success,
+        "Degraded" => MudBlazor.Severity.Warning,
+        "Unhealthy" => MudBlazor.Severity.Error,
+        _ => MudBlazor.Severity.Info
     };
-
-    private void ViewAgent(string agentId)
-    {
-        Navigation.NavigateTo($"/agents/{agentId}");
-    }
-
-    private async Task PauseAgent(string agentId)
-    {
-        var reason = await ShowPauseReasonDialog();
-        if (!string.IsNullOrEmpty(reason))
-        {
-            await HubService.SendPauseCommandAsync(agentId, "pause", reason);
-        }
-    }
-
-    private async Task ResumeAgent(string agentId)
-    {
-        await HubService.SendPauseCommandAsync(agentId, "resume", string.Empty);
-    }
-
-    private async Task<string?> ShowPauseReasonDialog()
-    {
-        var parameters = new DialogParameters { ["Title"] = "Pause Monitoring", ["Message"] = "Enter reason for pausing:" };
-        var dialog = await DialogService.ShowAsync<PauseReasonDialog>("Pause", parameters);
-        var result = await dialog.Result;
-        return result?.Data as string;
-    }
-
-    [Inject] IDialogService DialogService { get; set; } = default!;
-    [Inject] NavigationManager Navigation { get; set; } = default!;
 }

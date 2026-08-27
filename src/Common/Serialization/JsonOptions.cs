@@ -81,17 +81,10 @@ public class TimeSpanConverter : JsonConverter<TimeSpan>
 }
 
 /// <summary>
-/// Protobuf serialization helpers.
+/// Protobuf serialization helpers (stub - proto files deleted, using manual types).
 /// </summary>
 public static class ProtobufExtensions
 {
-    public static byte[] ToByteArray(this Google.Protobuf.IMessage message)
-    {
-        return message.ToByteArray();
-    }
-
-    public static T ParseFrom<T>(this byte[] data) where T : Google.Protobuf.IMessage<T>, new()
-    {
-        return new T().MergeFrom(data);
-    }
+    // Proto serialization disabled - proto files deleted and manual types don't implement IMessage<T>
+    // ToByteArray and ParseFrom not available without proto generation.
 }

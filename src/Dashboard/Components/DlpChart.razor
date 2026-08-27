@@ -1,56 +1,21 @@
-@using ChartJs.Blazor
-@using ChartJs.Blazor.Charts
-@using ChartJs.Blazor.ChartJS.Common.Enums
+@using MudBlazor
 
 <MudCard Class="h-100">
     <MudCardContent>
-        <ChartJsDoughnutChart @ref="_chart" Config="@_config" />
+        <MudText Typo="Typo.h6" Class="text-warning">DLP Monitoring</MudText>
+        <MudDivider />
+        @if (Data.Count > 0)
+        {
+            <MudText>Total DLP Events: @Data.Values.Sum()</MudText>
+            <MudText>Critical: @Data.Count(kvp => kvp.Value >= 80)</MudText>
+        }
+        else
+        {
+            <MudText>No DLP events recorded</MudText>
+        }
     </MudCardContent>
 </MudCard>
 
 @code {
-    private ChartJsDoughnutChart? _chart;
-    private DoughnutConfig _config = new();
-
     [Parameter] public Dictionary<string, int> Data { get; set; } = new();
-
-    protected override void OnParametersSet()
-    {
-        _config = new DoughnutConfig
-        {
-            Options = new DoughnutOptions
-            {
-                Responsive = true,
-                MaintainAspectRatio = false,
-                Plugins = new Plugins
-                {
-                    Legend = new Legend { Display = true, Position = Position.Right }
-                }
-            }
-        };
-
-        var labels = Data.Keys.ToArray();
-        var values = Data.Values.Select(v => (double)v).ToArray();
-
-        var colors = new[]
-        {
-            "rgba(244, 67, 54, 0.8)",   // Critical - Red
-            "rgba(255, 152, 0, 0.8)",   // High - Orange
-            "rgba(255, 235, 59, 0.8)",  // Medium - Yellow
-            "rgba(33, 150, 243, 0.8)",  // Low - Blue
-            "rgba(158, 158, 158, 0.8)"  // Info - Grey
-        };
-
-        var dataset = new DoughnutDataset
-        {
-            Label = "DLP Events",
-            Data = values,
-            BackgroundColor = colors.Take(labels.Length).ToArray(),
-            BorderColor = colors.Select(c => c.Replace("0.8", "1")).Take(labels.Length).ToArray(),
-            BorderWidth = 2
-        };
-
-        _config.Data.Labels = labels;
-        _config.Data.Datasets.Add(dataset);
-    }
 }

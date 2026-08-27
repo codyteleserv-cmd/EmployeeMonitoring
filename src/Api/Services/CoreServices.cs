@@ -1,15 +1,35 @@
 using EmployeeMonitoring.Api.Data;
 using EmployeeMonitoring.Api.Models;
 using EmployeeMonitoring.Contracts;
+using DlpEventType = EmployeeMonitoring.Api.Models.DlpEventType;
+using Severity = EmployeeMonitoring.Api.Models.Severity;
 
 namespace EmployeeMonitoring.Api.Services;
+
+
+/// <summary>Internal audit entry (not the protobuf type).</summary>
+public sealed record AuditEntry(
+    string LogId,
+    long Timestamp,
+    string ActorId,
+    string ActorName,
+    string ActorRole,
+    string Action,
+    string TargetType,
+    string TargetId,
+    string TargetName,
+    string Details,
+    string IpAddress,
+    string UserAgent,
+    bool Success,
+    string? ErrorMessage);
 
 /// <summary>
 /// Audit logging service.
 /// </summary>
 public interface IAuditService
 {
-    Task LogAsync(AuditLogEntry entry, CancellationToken cancellationToken = default);
+    Task LogAsync(AuditEntry entry, CancellationToken cancellationToken = default);
     Task LogAgentActionAsync(string agentId, string action, string details, bool success, string? errorMessage = null, CancellationToken cancellationToken = default);
     Task LogAdminActionAsync(string adminUserId, string action, string targetType, string targetId, string details, bool success, CancellationToken cancellationToken = default);
     Task LogPauseEventAsync(string agentId, string userName, string action, string reason, int durationSeconds, bool adminNotified, CancellationToken cancellationToken = default);
@@ -30,7 +50,7 @@ public class AuditService : IAuditService
         _logger = logger;
     }
 
-    public async Task LogAsync(AuditLogEntry entry, CancellationToken cancellationToken = default)
+    public async Task LogAsync(AuditEntry entry, CancellationToken cancellationToken = default)
     {
         var auditLog = new AuditLog
         {
@@ -38,7 +58,7 @@ public class AuditService : IAuditService
             ActorId = entry.ActorId,
             ActorName = entry.ActorName,
             ActorRole = entry.ActorRole,
-            Action = entry.Action,
+            Action = entry.Action.ToString(),
             TargetType = entry.TargetType,
             TargetId = entry.TargetId,
             TargetName = entry.TargetName,
@@ -57,7 +77,7 @@ public class AuditService : IAuditService
         var agent = await _agentRepository.GetByAgentIdAsync(agentId);
         if (agent == null) return;
 
-        var entry = new AuditLogEntry(
+        var entry = new AuditEntry(
             LogId: Guid.NewGuid().ToString(),
             Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             ActorId: agent.User?.UserSid ?? agent.AgentId,
@@ -79,7 +99,7 @@ public class AuditService : IAuditService
 
     public async Task LogAdminActionAsync(string adminUserId, string action, string targetType, string targetId, string details, bool success, CancellationToken cancellationToken = default)
     {
-        var entry = new AuditLogEntry(
+        var entry = new AuditEntry(
             LogId: Guid.NewGuid().ToString(),
             Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             ActorId: adminUserId,
@@ -104,7 +124,7 @@ public class AuditService : IAuditService
         var agent = await _agentRepository.GetByAgentIdAsync(agentId);
         if (agent == null) return;
 
-        var entry = new AuditLogEntry(
+        var entry = new AuditEntry(
             LogId: Guid.NewGuid().ToString(),
             Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             ActorId: agent.User?.UserSid ?? agent.AgentId,
@@ -129,7 +149,7 @@ public class AuditService : IAuditService
         var agent = await _agentRepository.GetByAgentIdAsync(agentId);
         if (agent == null) return;
 
-        var entry = new AuditLogEntry(
+        var entry = new AuditEntry(
             LogId: Guid.NewGuid().ToString(),
             Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             ActorId: agent.User?.UserSid ?? agent.AgentId,
@@ -154,7 +174,7 @@ public class AuditService : IAuditService
         var agent = await _agentRepository.GetByAgentIdAsync(agentId);
         if (agent == null) return;
 
-        var entry = new AuditLogEntry(
+        var entry = new AuditEntry(
             LogId: Guid.NewGuid().ToString(),
             Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             ActorId: adminUserId,
@@ -276,8 +296,8 @@ public class NotificationService : INotificationService
 /// </summary>
 public interface IReportService
 {
-    Task<ReportJob> GenerateAsync(ReportType type, DateTimeOffset startTime, DateTimeOffset endTime, IEnumerable<Guid>? agentIds = null, string? requestedBy = null, CancellationToken cancellationToken = default);
-    Task<ReportJob> GetStatusAsync(string jobId, CancellationToken cancellationToken = default);
+    Task<ReportJobInfo> GenerateAsync(ReportType type, DateTimeOffset startTime, DateTimeOffset endTime, IEnumerable<Guid>? agentIds = null, string? requestedBy = null, CancellationToken cancellationToken = default);
+    Task<ReportJobInfo> GetStatusAsync(string jobId, CancellationToken cancellationToken = default);
     Task<Stream> DownloadAsync(string jobId, CancellationToken cancellationToken = default);
 }
 
@@ -290,13 +310,13 @@ public class ReportService : IReportService
         _logger = logger;
     }
 
-    public async Task<ReportJob> GenerateAsync(ReportType type, DateTimeOffset startTime, DateTimeOffset endTime, IEnumerable<Guid>? agentIds = null, string? requestedBy = null, CancellationToken cancellationToken = default)
+    public async Task<ReportJobInfo> GenerateAsync(ReportType type, DateTimeOffset startTime, DateTimeOffset endTime, IEnumerable<Guid>? agentIds = null, string? requestedBy = null, CancellationToken cancellationToken = default)
     {
-        var job = new ReportJob
+        var job = new ReportJobInfo
         {
             JobId = Guid.NewGuid().ToString(),
             Type = type,
-            Status = ReportStatus.Queued,
+            Status = ReportJobStatus.Queued,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
@@ -306,12 +326,12 @@ public class ReportService : IReportService
         return job;
     }
 
-    public async Task<ReportJob> GetStatusAsync(string jobId, CancellationToken cancellationToken = default)
+    public async Task<ReportJobInfo> GetStatusAsync(string jobId, CancellationToken cancellationToken = default)
     {
-        return new ReportJob
+        return new ReportJobInfo
         {
             JobId = jobId,
-            Status = ReportStatus.Completed,
+            Status = ReportJobStatus.Completed,
             DownloadUrl = $"/api/reports/{jobId}/download"
         };
     }
@@ -333,7 +353,7 @@ public enum ReportType
     UserActivity = 5
 }
 
-public enum ReportStatus
+public enum ReportJobStatus
 {
     Queued = 0,
     Running = 1,
@@ -342,11 +362,11 @@ public enum ReportStatus
     Expired = 4
 }
 
-public class ReportJob
+public class ReportJobInfo
 {
     public string JobId { get; set; } = string.Empty;
     public ReportType Type { get; set; }
-    public ReportStatus Status { get; set; }
+    public ReportJobStatus Status { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }

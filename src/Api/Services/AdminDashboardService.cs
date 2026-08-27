@@ -4,6 +4,17 @@ using EmployeeMonitoring.Api.Services;
 using EmployeeMonitoring.Contracts;
 using Grpc.Core;
 using Microsoft.EntityFrameworkCore;
+using AgentConfiguration = EmployeeMonitoring.Contracts.AgentConfiguration;
+using GlobalConfiguration = EmployeeMonitoring.Contracts.GlobalConfiguration;
+using AlertRule = EmployeeMonitoring.Contracts.AlertRule;
+using ActivitySummary = EmployeeMonitoring.Contracts.ActivitySummary;
+using PauseStatistics = EmployeeMonitoring.Contracts.PauseStatistics;
+using DlpStatistics = EmployeeMonitoring.Contracts.DlpStatistics;
+using ReportJob = EmployeeMonitoring.Contracts.ReportJob;
+using HealthStatus = EmployeeMonitoring.Contracts.HealthStatus;
+using ProductivityLevel = EmployeeMonitoring.Contracts.ProductivityLevel;
+using PauseAction = EmployeeMonitoring.Contracts.PauseAction;
+using ReportStatus = EmployeeMonitoring.Contracts.ReportStatus;
 
 namespace EmployeeMonitoring.Api.Services;
 
@@ -150,7 +161,7 @@ public class AdminDashboardService : IAdminDashboardService
             IsPaused = agent.IsPaused,
             CurrentPauseDurationSeconds = agent.CurrentPauseDurationSeconds,
             Health = (HealthStatus)(int)agent.Health,
-            Tags = { agent.User?.Role ?? "employee" }
+            Tags = { ["role"] = agent.User?.Role ?? "employee" }
         };
     }
 
@@ -233,11 +244,11 @@ public class AdminDashboardService : IAdminDashboardService
             Buckets = { /* Would build time buckets */ },
             Totals = new ActivityTotals
             {
-                TotalSeconds = summary.TotalSeconds,
-                ProductiveSeconds = summary.ProductiveSeconds,
-                NeutralSeconds = summary.NeutralSeconds,
-                DistractingSeconds = summary.DistractingSeconds,
-                IdleSeconds = summary.IdleSeconds,
+                TotalSeconds = (int)summary.TotalSeconds,
+                ProductiveSeconds = (int)summary.ProductiveSeconds,
+                NeutralSeconds = (int)summary.NeutralSeconds,
+                DistractingSeconds = (int)summary.DistractingSeconds,
+                IdleSeconds = (int)summary.IdleSeconds,
                 ProductivityScore = summary.ProductivityScore,
                 ProcessBreakdown = { summary.ProcessBreakdown },
                 CategoryBreakdown = { summary.CategoryBreakdown }
@@ -265,15 +276,26 @@ public class AdminDashboardService : IAdminDashboardService
 
     public async Task GetPauseEventsAsync(GetPauseEventsRequest request, IServerStreamWriter<PauseEventRecord> responseStream, CancellationToken cancellationToken)
     {
-        var agentIds = request.AgentIds.Count > 0 
-            ? request.AgentIds.Select(id => (await _agentRepository.GetByAgentIdAsync(id))?.Id ?? Guid.Empty).ToList()
+        List<Guid>? agentIds = null;
+        if (request.AgentIds.Count > 0)
+        {
+            agentIds = new List<Guid>();
+            foreach (var id in request.AgentIds)
+            {
+                var a = await _agentRepository.GetByAgentIdAsync(id);
+                agentIds.Add(a?.Id ?? Guid.Empty);
+            }
+        }
+
+        Models.PauseAction? filterAction = request.FilterAction != PauseAction.Paused
+            ? (Models.PauseAction)(int)request.FilterAction
             : null;
 
         var events = await _pauseRepository.GetByAgentAsync(
             agentIds?.FirstOrDefault() ?? Guid.Empty,
             request.StartTime > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(request.StartTime) : null,
             request.EndTime > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(request.EndTime) : null,
-            request.FilterAction != PauseAction.Paused ? (PauseAction?)request.FilterAction : null,
+            filterAction,
             request.Limit);
 
         foreach (var evt in events)
@@ -296,13 +318,31 @@ public class AdminDashboardService : IAdminDashboardService
 
     public async Task<PauseStatistics> GetPauseStatisticsAsync(GetPauseStatisticsRequest request)
     {
-        var agentIds = request.AgentIds.Count > 0
-            ? request.AgentIds.Select(id => (await _agentRepository.GetByAgentIdAsync(id))?.Id ?? Guid.Empty).ToList()
-            : null;
+        List<Guid>? agentIds = null;
+        if (request.AgentIds.Count > 0)
+        {
+            agentIds = new List<Guid>();
+            foreach (var id in request.AgentIds)
+            {
+                var a = await _agentRepository.GetByAgentIdAsync(id);
+                agentIds.Add(a?.Id ?? Guid.Empty);
+            }
+        }
 
-        return await _pauseRepository.GetStatisticsAsync(agentIds, 
+        var stats = await _pauseRepository.GetStatisticsAsync(agentIds, 
             request.StartTime > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(request.StartTime) : null,
             request.EndTime > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(request.EndTime) : null);
+
+        // Map service DTO -> Contracts message
+        return new PauseStatistics
+        {
+            StartTime = request.StartTime,
+            EndTime = request.EndTime,
+            TotalPauseEvents = stats.TotalPauseEvents,
+            TotalPauseDurationSeconds = (int)stats.TotalPauseDurationSeconds,
+            AvgPauseDurationSeconds = stats.AveragePauseDurationSeconds,
+            MaxPauseDurationSeconds = stats.MaxPauseDurationSeconds
+        };
     }
 
     public async Task<ForceResumeResponse> ForceResumeAgentAsync(ForceResumeRequest request)
@@ -333,23 +373,44 @@ public class AdminDashboardService : IAdminDashboardService
 
     public async Task GetDlpEventsAsync(GetDlpEventsRequest request, IServerStreamWriter<DlpEventRecord> responseStream, CancellationToken cancellationToken)
     {
-        var agentIds = request.AgentIds.Count > 0
-            ? request.AgentIds.Select(id => (await _agentRepository.GetByAgentIdAsync(id))?.Id ?? Guid.Empty).ToList()
-            : null;
-
         // Implementation would filter and stream events
         await Task.CompletedTask;
     }
 
     public async Task<DlpStatistics> GetDlpStatisticsAsync(GetDlpStatisticsRequest request)
     {
-        var agentIds = request.AgentIds.Count > 0
-            ? request.AgentIds.Select(id => (await _agentRepository.GetByAgentIdAsync(id))?.Id ?? Guid.Empty).ToList()
-            : null;
+        List<Guid>? agentIds = null;
 
-        return await _dlpRepository.GetStatisticsAsync(agentIds?.FirstOrDefault(),
+        if (request.AgentIds.Count > 0)
+
+        {
+
+            agentIds = new List<Guid>();
+
+            foreach (var id in request.AgentIds)
+
+            {
+
+                var a = await _agentRepository.GetByAgentIdAsync(id);
+
+                agentIds.Add(a?.Id ?? Guid.Empty);
+
+            }
+
+        }
+
+        var dlpStats = await _dlpRepository.GetStatisticsAsync(agentIds?.FirstOrDefault(),
             request.StartTime > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(request.StartTime) : null,
             request.EndTime > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(request.EndTime) : null);
+
+        return new DlpStatistics
+        {
+            StartTime = request.StartTime,
+            EndTime = request.EndTime,
+            TotalEvents = dlpStats.TotalEvents,
+            BlockedCount = dlpStats.BlockedCount,
+            AcknowledgedCount = dlpStats.AcknowledgedCount
+        };
     }
 
     public async Task<AcknowledgeDlpEventResponse> AcknowledgeDlpEventAsync(AcknowledgeDlpEventRequest request)
@@ -448,7 +509,7 @@ public class AdminDashboardService : IAdminDashboardService
         if (!string.IsNullOrEmpty(request.UserId))
             agents = agents.Where(a => a.UserId == Guid.Parse(request.UserId)).ToList();
 
-        if (request.State != AgentState.Unknown)
+        if (request.State != AgentState.AgentUnknown)
             agents = agents.Where(a => (AgentState)(int)a.Status == request.State).ToList();
 
         return new DeviceList
@@ -599,12 +660,12 @@ public class AdminDashboardService : IAdminDashboardService
 
     public async Task<ReportJob> GenerateReportAsync(GenerateReportRequest request)
     {
-        return new ReportJob { JobId = Guid.NewGuid().ToString(), Status = ReportStatus.Queued };
+        return new ReportJob { JobId = Guid.NewGuid().ToString(), Status = EmployeeMonitoring.Contracts.ReportStatus.Queued };
     }
 
     public async Task<ReportJob> GetReportStatusAsync(GetReportStatusRequest request)
     {
-        return new ReportJob { JobId = request.JobId, Status = ReportStatus.Completed };
+        return new ReportJob { JobId = request.JobId, Status = EmployeeMonitoring.Contracts.ReportStatus.Completed };
     }
 
     public async Task DownloadReportAsync(DownloadReportRequest request, IServerStreamWriter<ReportChunk> responseStream, CancellationToken cancellationToken)

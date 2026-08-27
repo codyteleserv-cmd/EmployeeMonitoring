@@ -6,6 +6,7 @@ using EmployeeMonitoring.Api.Jobs;
 using EmployeeMonitoring.Api.Middleware;
 using EmployeeMonitoring.Api.Services;
 using EmployeeMonitoring.Common.Health;
+using Quartz;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.EntityFrameworkCore;
@@ -147,7 +148,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
 // Mapster
-builder.Services.AddMapster();
+// Mapster: register TypeAdapterConfig if needed
+// builder.Services.AddMapster(); // requires Mapster.DependencyInjection
 
 // Custom Services
 builder.Services.AddScoped<IAgentRepository, AgentRepository>();
@@ -159,19 +161,27 @@ builder.Services.AddScoped<IAuditRepository, AuditRepository>();
 
 builder.Services.AddSingleton<IAgentConnectionManager, AgentConnectionManager>();
 builder.Services.AddSingleton<IAdminConnectionManager, AdminConnectionManager>();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 
-// Hosted Services
-builder.Services.AddHostedService<AgentHealthMonitoringService>();
-builder.Services.AddHostedService<DataRetentionJob>();
-builder.Services.AddHostedService<ConfigurationDeploymentJob>();
-
-// Quartz
+// Quartz jobs (IJob implementations — not IHostedService)
 builder.Services.AddQuartz(q =>
 {
     q.UseMicrosoftDependencyInjectionJobFactory();
+
+    var healthKey = new Quartz.JobKey("AgentHealthMonitoring");
+    q.AddJob<EmployeeMonitoring.Api.Jobs.AgentHealthMonitoringService>(opts => opts.WithIdentity(healthKey));
+    q.AddTrigger(opts => opts.ForJob(healthKey).WithIdentity("AgentHealthMonitoring-trigger").WithCronSchedule("0 */1 * * * ?"));
+
+    var retentionKey = new Quartz.JobKey("DataRetention");
+    q.AddJob<EmployeeMonitoring.Api.Jobs.DataRetentionJob>(opts => opts.WithIdentity(retentionKey));
+    q.AddTrigger(opts => opts.ForJob(retentionKey).WithIdentity("DataRetention-trigger").WithCronSchedule("0 0 2 * * ?"));
+
+    var configKey = new Quartz.JobKey("ConfigurationDeployment");
+    q.AddJob<EmployeeMonitoring.Api.Jobs.ConfigurationDeploymentJob>(opts => opts.WithIdentity(configKey));
+    q.AddTrigger(opts => opts.ForJob(configKey).WithIdentity("ConfigurationDeployment-trigger").WithCronSchedule("0 */5 * * * ?"));
 });
 builder.Services.AddQuartzHostedService(options => options.WaitForJobsToComplete = true);
 
@@ -179,7 +189,7 @@ builder.Services.AddQuartzHostedService(options => options.WaitForJobsToComplete
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<MonitoringDbContext>()
     .AddDbContextCheck<AuditDbContext>()
-    .AddCheck<AgentHealthCheck>("agents");
+    .AddCheck<EmployeeMonitoring.Common.Health.AgentHealthCheck>("agents");
 
 var app = builder.Build();
 

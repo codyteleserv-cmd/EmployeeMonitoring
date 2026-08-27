@@ -1,6 +1,13 @@
 using EmployeeMonitoring.Api.Services;
 using EmployeeMonitoring.Contracts;
 using Grpc.Core;
+using ActivitySummary = EmployeeMonitoring.Contracts.ActivitySummary;
+using PauseStatistics = EmployeeMonitoring.Contracts.PauseStatistics;
+using DlpStatistics = EmployeeMonitoring.Contracts.DlpStatistics;
+using ReportJob = EmployeeMonitoring.Contracts.ReportJob;
+using AgentConfiguration = EmployeeMonitoring.Contracts.AgentConfiguration;
+using GlobalConfiguration = EmployeeMonitoring.Contracts.GlobalConfiguration;
+using AlertRule = EmployeeMonitoring.Contracts.AlertRule;
 
 namespace EmployeeMonitoring.Api.GrpcServices;
 
