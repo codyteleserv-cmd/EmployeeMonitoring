@@ -33,9 +33,9 @@ message AgentMessage {
     ActivityBatch activities = 3;
     PauseEvent pauseEvent = 4;
     DlpEvent dlpEvent = 5;
-    Heartbeat heartbeat = 6;
+    HeartbeatRequest heartbeat = 6;
     DiagnosticInfo diagnostics = 7;
-    ConsentAck consentAck = 8;
+    ConsentResponse consentAck = 8;
   }
   string agent_id = 100;
   int64 timestamp = 101; // Unix milliseconds
@@ -376,11 +376,11 @@ enum DlpEventType {
 }
 
 enum Severity {
-  INFO = 0;
+  AGENT_INFO = 0;
   LOW = 1;
-  MEDIUM = 2;
+  AGENT_SEVERITY_MEDIUM = 2;
   HIGH = 3;
-  CRITICAL = 4;
+  AGENT_SEVERITY_CRITICAL = 4;
 }
 
 // ============================================================================
